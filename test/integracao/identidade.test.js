@@ -47,6 +47,14 @@ describe('cadastro e login', () => {
     assert.deepEqual(campos, ['email', 'senha']);
   });
 
+  test('tipo errado e diferente de campo ausente na mensagem', async () => {
+    const r = await amb.chamar('POST', '/usuarios', { corpo: { nome: 123, email: 'tipo@teste.local' } });
+    assert.equal(r.status, 422);
+    const porCampo = Object.fromEntries(r.corpo.details.map((d) => [d.field, d.issue]));
+    assert.equal(porCampo.nome, 'Tipo invalido: esperado string.');
+    assert.equal(porCampo.senha, 'Campo obrigatorio.');
+  });
+
   test('login valido devolve token que funciona em /usuarios/me', async () => {
     const login = await amb.chamar('POST', '/auth/login', { corpo: { email: EMAILS.gerenteCentro, senha: 'Demo@12345' } });
     assert.equal(login.status, 200);

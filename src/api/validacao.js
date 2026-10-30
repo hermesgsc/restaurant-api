@@ -11,9 +11,11 @@ function caminho(path) {
 
 // traduz as issues do zod pro formato {field, issue} do envelope de erro
 function descrever(issue) {
+  // campo ausente pode chegar como invalid_type ou invalid_value (enum), depende do schema
+  if (issue.input === undefined && (issue.code === 'invalid_type' || issue.code === 'invalid_value')) return 'Campo obrigatorio.';
   switch (issue.code) {
     case 'invalid_type':
-      return issue.input === undefined ? 'Campo obrigatorio.' : `Tipo invalido: esperado ${issue.expected}.`;
+      return `Tipo invalido: esperado ${issue.expected}.`;
     case 'invalid_value':
       return `Valor invalido. Aceitos: ${issue.values.join(', ')}.`;
     case 'too_small':
@@ -36,7 +38,8 @@ function descrever(issue) {
 }
 
 export function validar(schema, dados, origem = 'body') {
-  const resultado = schema.safeParse(dados ?? {});
+  // reportInput deixa saber se o campo veio vazio; o valor recebido nunca vai pra resposta
+  const resultado = schema.safeParse(dados ?? {}, { reportInput: true });
   if (resultado.success) return resultado.data;
   const detalhes = [];
   for (const issue of resultado.error.issues) {
