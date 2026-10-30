@@ -9,6 +9,8 @@ import { criarServicoUnidades } from './application/unidades.js';
 import { criarServicoProdutos } from './application/produtos.js';
 import { criarServicoCardapio } from './application/cardapio.js';
 import { criarServicoEstoque } from './application/estoque.js';
+import { criarServicoIdempotencia } from './application/idempotencia.js';
+import { criarServicoPedidos } from './application/pedidos.js';
 import { autenticar } from './api/middlewares/autenticacao.js';
 import { cabecalhosSeguranca, cors, criarLogger, logRequisicoes, requestId, rotaNaoEncontrada } from './api/middlewares/basicos.js';
 import { tratadorErros } from './api/http-erros.js';
@@ -16,6 +18,7 @@ import { rotasIdentidade } from './api/rotas/identidade.js';
 import { rotasCatalogo } from './api/rotas/catalogo.js';
 import { rotasAuditorias } from './api/rotas/auditorias.js';
 import { rotasEstoque } from './api/rotas/estoque.js';
+import { rotasPedidos } from './api/rotas/pedidos.js';
 
 // monta os servicos da aplicacao em cima de um banco ja aberto.
 // e o mesmo ponto de entrada pro servidor, pros comandos e pros testes
@@ -29,7 +32,9 @@ export function criarServicos(config, db) {
   const produtos = criarServicoProdutos({ db, auditoria });
   const cardapio = criarServicoCardapio({ db, auditoria, unidades, produtos });
   const estoque = criarServicoEstoque({ db, auditoria, unidades, produtos });
-  return { db, auditoria, senhas, tokens, usuarios, unidades, produtos, cardapio, estoque };
+  const idempotencia = criarServicoIdempotencia({ db });
+  const pedidos = criarServicoPedidos({ db, config, auditoria, estoque, idempotencia });
+  return { db, auditoria, senhas, tokens, usuarios, unidades, produtos, cardapio, estoque, idempotencia, pedidos };
 }
 
 export function criarApp(config, { db = abrirBanco(config.arquivoBanco), logger = criarLogger(config.ambiente) } = {}) {
@@ -56,6 +61,7 @@ export function criarApp(config, { db = abrirBanco(config.arquivoBanco), logger 
   app.use(rotasIdentidade(deps));
   app.use(rotasCatalogo(deps));
   app.use(rotasEstoque(deps));
+  app.use(rotasPedidos(deps));
   app.use(rotasAuditorias(deps));
 
   app.use(rotaNaoEncontrada());
