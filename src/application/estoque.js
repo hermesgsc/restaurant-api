@@ -26,6 +26,7 @@ function paraMovimento(l) {
     quantidade: l.quantidade,
     totalApos: l.total_apos,
     reservadaApos: l.reservada_apos,
+    pedidoId: l.pedido_id,
     usuarioId: l.usuario_id,
     motivo: l.motivo,
     criadoEm: l.criado_em,
@@ -41,14 +42,14 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
     WHERE unidade_id = ? AND produto_id = ? AND quantidade_total = ? AND quantidade_reservada = ?`);
 
   const inserirMovimento = db.prepare(`INSERT INTO estoque_movimentacoes
-    (unidade_id, produto_id, tipo, quantidade, total_apos, reservada_apos, usuario_id, motivo, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    (unidade_id, produto_id, tipo, quantidade, total_apos, reservada_apos, pedido_id, usuario_id, motivo, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   // unico caminho que muda saldo de estoque. roda dentro de transacao
   // (BEGIN IMMEDIATE) e grava o movimento junto, entao saldo e historico
   // nunca ficam diferentes. a regra de negativo fica no dominio e o banco
   // confere de novo pelos CHECK.
-  function movimentar({ unidadeId, produtoId, tipo, quantidade, usuarioId = null, motivo = null }) {
+  function movimentar({ unidadeId, produtoId, tipo, quantidade, pedidoId = null, usuarioId = null, motivo = null }) {
     return transacao(db, () => {
       const instante = agora();
       let linha = buscarSaldo.get(unidadeId, produtoId);
@@ -60,7 +61,7 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
       const novo = aplicarMovimento(atual, tipo, quantidade);
       const r = gravarSaldo.run(novo.total, novo.reservada, instante, unidadeId, produtoId, atual.total, atual.reservada);
       if (r.changes !== 1) throw erros.conflito('ESTOQUE_CONCORRENTE', 'O estoque mudou durante a operacao. Tente novamente.');
-      const movimento = inserirMovimento.run(unidadeId, produtoId, tipo, quantidade, novo.total, novo.reservada, usuarioId, motivo, instante);
+      const movimento = inserirMovimento.run(unidadeId, produtoId, tipo, quantidade, novo.total, novo.reservada, pedidoId, usuarioId, motivo, instante);
       return { id: Number(movimento.lastInsertRowid), saldo: novo, disponivel: disponivel(novo) };
     });
   }
