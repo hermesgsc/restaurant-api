@@ -11,6 +11,7 @@ const novoPedido = z.strictObject({
   canalPedido: z.enum(CANAIS_PEDIDO),
   formaPagamento: z.enum(['MOCK']),
   clienteId: z.int().positive().optional(),
+  pontosResgatar: z.int().positive().multipleOf(10).max(100000).optional(),
   itens: z.array(z.strictObject({
     produtoId: z.int().positive(),
     quantidade: z.int().min(1).max(LIMITES_PEDIDO.maxQuantidade),

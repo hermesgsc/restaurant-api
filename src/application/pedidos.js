@@ -4,6 +4,7 @@ import { ehFuncionario, Papel, temEscopoUnidade } from '../domain/papeis.js';
 import { multiplicar, somar } from '../domain/dinheiro.js';
 import { TipoMovimento } from '../domain/estoque.js';
 import { ReservaEstoque, StatusPedido } from '../domain/pedido.js';
+import { StatusResgate } from '../domain/fidelidade.js';
 
 const PAPEIS_QUE_VENDEM = [Papel.ADMIN, Papel.GERENTE, Papel.ATENDENTE];
 
@@ -28,6 +29,8 @@ export function paraPedido(l, itens) {
     prontoEm: l.pronto_em,
     entregueEm: l.entregue_em,
     canceladoEm: l.cancelado_em,
+    pontosResgatados: l.pontos_resgatados,
+    resgateStatus: l.resgate_status,
   };
   if (itens) {
     pedido.itens = itens.map((i) => ({
@@ -41,7 +44,7 @@ export function paraPedido(l, itens) {
   return pedido;
 }
 
-export function criarServicoPedidos({ db, config, auditoria, estoque, idempotencia }) {
+export function criarServicoPedidos({ db, config, auditoria, estoque, idempotencia, fidelidade }) {
   const buscarPedido = db.prepare('SELECT * FROM pedidos WHERE id = ?');
   const buscarItens = db.prepare('SELECT * FROM pedido_itens WHERE pedido_id = ? ORDER BY id');
   const buscarUnidade = db.prepare('SELECT * FROM unidades WHERE id = ?');
@@ -142,6 +145,14 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
         throw erro;
       }
     });
+
+    // resgate de pontos: debita o saldo na mesma transacao e grava o desconto.
+    // se algo falhar depois (estoque, por exemplo) o rollback devolve os pontos
+    if (dados.pontosResgatar) {
+      const desconto = fidelidade.reservarResgate({ ator, clienteId, pedidoId, pontos: dados.pontosResgatar, subtotalCentavos: subtotal });
+      db.prepare(`UPDATE pedidos SET desconto_centavos = ?, total_centavos = ?, pontos_resgatados = ?, resgate_status = ?
+        WHERE id = ?`).run(desconto, subtotal - desconto, dados.pontosResgatar, StatusResgate.RESERVADO, pedidoId);
+    }
     return pedidoId;
   }
 
@@ -156,7 +167,7 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
         const pedido = detalhar(pedidoId);
         auditoria.registrar({
           ator, acao: 'PEDIDO_CRIADO', recursoTipo: 'PEDIDO', recursoId: pedidoId, unidadeId: pedido.unidadeId, requestId,
-          detalhes: { canalPedido: pedido.canalPedido, totalCentavos: pedido.totalCentavos, itens: pedido.itens.length },
+          detalhes: { canalPedido: pedido.canalPedido, totalCentavos: pedido.totalCentavos, itens: pedido.itens.length, pontosResgatados: pedido.pontosResgatados },
         });
         return { status: 201, corpo: pedido };
       },

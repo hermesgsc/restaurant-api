@@ -14,7 +14,7 @@ export const MotivoCancelamento = Object.freeze({
 // efeitos de cada mudanca de estado do pedido. toda mudanca usa UPDATE com
 // "WHERE status = <estado esperado>": se pagamento, cancelamento e expiracao
 // correrem juntos, so o primeiro muda a linha e os outros veem changes = 0.
-export function criarCicloPedido({ db, auditoria, estoque, pedidos }) {
+export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }) {
   const buscarItens = db.prepare('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? ORDER BY id');
   const pagamentoVivo = db.prepare("SELECT id, status FROM pagamentos WHERE pedido_id = ? AND status IN ('PROCESSANDO', 'INDEFINIDO', 'APROVADO')");
 
@@ -35,6 +35,7 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos }) {
     );
     if (r.changes !== 1) return false;
     movimentarItens(pedidos.obterLinha(pedidoId), TipoMovimento.CONSUMO, usuarioId);
+    fidelidade.confirmarResgate(pedidoId);
     return true;
   }
 
@@ -49,6 +50,7 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos }) {
     if (r.changes !== 1) return false;
     const pedido = pedidos.obterLinha(pedidoId);
     movimentarItens(pedido, TipoMovimento.LIBERACAO, ator?.id ?? null);
+    fidelidade.liberarResgate(pedidoId);
     auditoria.registrar({
       ator, acao: 'PEDIDO_CANCELADO', recursoTipo: 'PEDIDO', recursoId: pedidoId, unidadeId: pedido.unidade_id,
       requestId: requestId ?? 'sistema', detalhes: { motivo },
@@ -95,6 +97,7 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos }) {
         ator, acao: 'PEDIDO_STATUS_ALTERADO', recursoTipo: 'PEDIDO', recursoId: pedidoId, unidadeId: atual.unidade_id, requestId,
         detalhes: { de: atual.status, para: novoStatus },
       });
+      if (novoStatus === StatusPedido.ENTREGUE) fidelidade.creditarEntrega(pedidoId, { ator, requestId });
       return pedidos.detalhar(pedidoId);
     });
   }
