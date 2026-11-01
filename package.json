@@ -12,6 +12,8 @@
     "db:migrate": "node scripts/migrar.js",
     "db:seed": "node scripts/seed.js",
     "db:reset": "node scripts/resetar-banco.js",
+    "pedidos:expirar": "node scripts/expirar-pedidos.js",
+    "pagamentos:reconciliar": "node scripts/reconciliar-pagamentos.js",
     "test": "node --test --test-concurrency=4 \"test/**/*.test.js\""
   },
   "dependencies": {

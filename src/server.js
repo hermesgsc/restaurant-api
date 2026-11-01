@@ -12,12 +12,28 @@ try {
   throw erro;
 }
 
-const { app, db } = criarApp(config);
+const { app, db, servicos } = criarApp(config);
 const servidor = app.listen(config.porta, () => {
   console.log(`API ouvindo em http://localhost:${config.porta} (ambiente ${config.ambiente})`);
 });
 
+// expiracao periodica dos pedidos sem pagamento. com intervalo 0 fica desligada
+// e da pra rodar so pelo comando npm run pedidos:expirar
+let timerExpiracao = null;
+if (config.expiracaoIntervaloMs > 0) {
+  timerExpiracao = setInterval(() => {
+    try {
+      const { expirados } = servicos.ciclo.expirarVencidos();
+      if (expirados > 0) console.log(`${expirados} pedido(s) expirado(s) por falta de pagamento.`);
+    } catch (erro) {
+      console.error('Falha ao expirar pedidos:', erro.message);
+    }
+  }, config.expiracaoIntervaloMs);
+  timerExpiracao.unref();
+}
+
 function encerrar() {
+  clearInterval(timerExpiracao);
   servidor.close(() => {
     db.close();
     process.exit(0);
