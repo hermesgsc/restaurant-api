@@ -49,5 +49,31 @@ export function criarServicoIdempotencia({ db }) {
     });
   }
 
-  return { executarSincrono };
+  // versao em duas fases pra operacoes que chamam servico externo (pagamento):
+  // `iniciar` grava a chave como EM_PROCESSAMENTO dentro da transacao de quem
+  // chamou, e `concluir` grava a resposta final depois da chamada externa
+  const inserirPendente = db.prepare(`INSERT INTO idempotencia_registros
+    (usuario_id, operacao, chave, hash_requisicao, estado, criado_em, atualizado_em)
+    VALUES (?, ?, ?, ?, 'EM_PROCESSAMENTO', ?, ?)`);
+  const marcarConcluido = db.prepare(`UPDATE idempotencia_registros
+    SET estado = 'CONCLUIDO', status_http = ?, corpo_resposta = ?, atualizado_em = ? WHERE id = ? AND estado = 'EM_PROCESSAMENTO'`);
+
+  function consultar({ usuarioId, operacao, chave, dados }) {
+    const hash = hashRequisicao(dados);
+    const registro = buscar.get(usuarioId, operacao, chave);
+    if (!registro) return { hash, registro: null };
+    if (registro.hash_requisicao !== hash) conferirExistente(registro, hash);
+    return { hash, registro };
+  }
+
+  function iniciar({ usuarioId, operacao, chave, hash }) {
+    const instante = agora();
+    return Number(inserirPendente.run(usuarioId, operacao, chave, hash, instante, instante).lastInsertRowid);
+  }
+
+  function concluir(id, status, corpo) {
+    marcarConcluido.run(status, JSON.stringify(corpo), agora(), id);
+  }
+
+  return { executarSincrono, consultar, iniciar, concluir };
 }

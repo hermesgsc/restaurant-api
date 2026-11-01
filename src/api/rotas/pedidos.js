@@ -24,6 +24,10 @@ const filtrosPedidos = z.strictObject({
   canalPedido: z.enum(CANAIS_PEDIDO).optional(),
 });
 
+// so as etapas manuais; EM_PREPARO vem do pagamento e CANCELADO do cancelamento
+const novoStatus = z.strictObject({ status: z.enum(['PRONTO', 'ENTREGUE']) });
+const cancelamento = z.strictObject({ motivo: z.string().trim().min(3).max(200).optional() });
+
 export function lerChaveIdempotencia(req) {
   const chave = req.get('idempotency-key');
   if (!chave || !CHAVE_VALIDA.test(chave)) {
@@ -55,6 +59,18 @@ export function rotasPedidos({ servicos, autenticar }) {
   r.get('/pedidos/:id', autenticar, (req, res) => {
     const { id } = validar(esquemaId, req.params, 'path');
     res.json(servicos.pedidos.obter(req.ator, id, req.requestId));
+  });
+
+  r.patch('/pedidos/:id/status', autenticar, (req, res) => {
+    const { id } = validar(esquemaId, req.params, 'path');
+    const { status } = validar(novoStatus, req.body);
+    res.json(servicos.ciclo.mudarStatus(req.ator, id, status, req.requestId));
+  });
+
+  r.post('/pedidos/:id/cancelamentos', autenticar, (req, res) => {
+    const { id } = validar(esquemaId, req.params, 'path');
+    const dados = validar(cancelamento, req.body ?? {});
+    res.json(servicos.ciclo.cancelar(req.ator, id, dados, req.requestId));
   });
 
   return r;

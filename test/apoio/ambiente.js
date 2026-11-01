@@ -8,8 +8,9 @@ import { criarApp } from '../../src/app.js';
 import { popular, SENHA_DEMO } from '../../src/infrastructure/seed.js';
 
 // cada arquivo de teste ganha um sqlite real e proprio numa pasta temporaria,
-// com migracoes e seed, e um servidor http numa porta livre
-export async function criarAmbiente(extras = {}) {
+// com migracoes e seed, e um servidor http numa porta livre.
+// `gateway` permite trocar o mock padrao por um controlado pelo teste
+export async function criarAmbiente(extras = {}, { gateway } = {}) {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'rede-api-teste-'));
   const config = carregarConfig({
     NODE_ENV: 'test',
@@ -22,7 +23,7 @@ export async function criarAmbiente(extras = {}) {
     ...extras,
   }, { lerEnv: false });
   const db = abrirBanco(config.arquivoBanco);
-  const { app, servicos } = criarApp(config, { db });
+  const { app, servicos } = criarApp(config, { db, gateway });
   const ids = await popular(db, servicos);
   const servidor = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
