@@ -16,6 +16,8 @@
     "pagamentos:reconciliar": "node scripts/reconciliar-pagamentos.js",
     "lgpd:anonimizar": "node scripts/anonimizar-usuario.js",
     "openapi:exportar": "node scripts/exportar-openapi.js",
+    "postman:gerar": "node scripts/gerar-colecao-postman.js",
+    "postman:executar": "node scripts/executar-postman.js",
     "test": "node --test --test-concurrency=4 \"test/**/*.test.js\""
   },
   "dependencies": {
