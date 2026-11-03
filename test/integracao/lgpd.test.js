@@ -68,6 +68,12 @@ describe('anonimizacao', () => {
     assert.ok(amb.db.prepare("SELECT 1 FROM auditorias WHERE acao = 'USUARIO_ANONIMIZADO' AND recurso_id = ?").get(String(c.id)));
   });
 
+  test('cadastro nao aceita o dominio reservado da anonimizacao', async () => {
+    const r = await amb.chamar('POST', '/usuarios', { corpo: { nome: 'Ocupante', email: 'anonimizado-1@anonimizado.invalid', senha: 'Senha@123' } });
+    assert.equal(r.status, 422);
+    assert.deepEqual(r.corpo.details, [{ field: 'email', issue: 'Dominio de e-mail nao permitido.' }]);
+  });
+
   test('titular anonimizado nao faz login e o token antigo deixa de valer', async () => {
     const c = await clienteComHistorico();
     amb.servicos.lgpd.anonimizar(c.id);
