@@ -1,0 +1,30 @@
+@startuml estados-pedido
+title Estados do pedido e do pagamento
+skinparam state {
+  BackgroundColor #FDFDFD
+  BorderColor #555555
+}
+
+state "Pedido" as P {
+  [*] --> AGUARDANDO_PAGAMENTO : POST /pedidos\n(reserva estoque)
+  AGUARDANDO_PAGAMENTO --> EM_PREPARO : pagamento APROVADO\n(consome reserva)
+  AGUARDANDO_PAGAMENTO --> CANCELADO : cancelamento (cliente, atendente,\ngerente, admin) / pagamento RECUSADO /\nexpiração (libera reserva e pontos)
+  EM_PREPARO --> PRONTO : PATCH status\n(cozinha, gerente, admin)
+  PRONTO --> ENTREGUE : PATCH status\n(atendente, gerente, admin)\n+ crédito de pontos
+  ENTREGUE --> [*]
+  CANCELADO --> [*]
+}
+
+state "Pagamento" as G {
+  [*] --> PROCESSANDO : fase 1
+  PROCESSANDO --> APROVADO : gateway aprova
+  PROCESSANDO --> RECUSADO : gateway recusa
+  PROCESSANDO --> INDEFINIDO : timeout / erro de rede
+  INDEFINIDO --> APROVADO : reconciliação aprova\n(pedido aguardando)
+  INDEFINIDO --> APROVADO_TARDIO : reconciliação aprova\n(pedido já cancelado)
+  INDEFINIDO --> RECUSADO : reconciliação recusa
+  APROVADO_TARDIO : reconciliacao = ESTORNO_MANUAL_PENDENTE
+  APROVADO --> [*]
+  RECUSADO --> [*]
+}
+@enduml

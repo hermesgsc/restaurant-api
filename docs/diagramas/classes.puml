@@ -1,0 +1,188 @@
+@startuml classes
+title Classes e módulos - camadas da API
+skinparam packageStyle folder
+skinparam class {
+  BackgroundColor #FDFDFD
+  BorderColor #555555
+}
+hide empty members
+
+package "api (Express)" {
+  class "app.js" as App {
+    +criarApp(config, opcoes)
+    +criarServicos(config, db, opcoes)
+  }
+  class "rotas/*" as Rotas <<Router>> {
+    identidade, catalogo, estoque,
+    pedidos, pagamentos, fidelidade, auditorias
+  }
+  class "validacao.js" as Validacao <<zod strictObject>>
+  class "http-erros.js" as HttpErros {
+    +envelopeErro(req, codigo, mensagem, detalhes)
+    +tratadorErros(logger)
+  }
+  class "middlewares" as Middlewares {
+    +autenticar(servicos, opcoes)
+    +exigirPapeis(...papeis)
+    +requestId()
+    +cabecalhosSeguranca()
+  }
+  class "openapi.js" as OpenApi {
+    +especificacaoOpenApi()
+  }
+}
+
+package "application (casos de uso)" {
+  class ServicoUsuarios {
+    +cadastrarCliente()
+    +login()
+    +perfil()
+    +carregarAtor()
+  }
+  class ServicoUnidades {
+    +listar()
+    +criar()
+    +atualizar()
+  }
+  class ServicoProdutos {
+    +listar()
+    +criar()
+    +atualizar()
+  }
+  class ServicoCardapio {
+    +listar()
+    +definirItem()
+  }
+  class ServicoEstoque {
+    +movimentar(ENTRADA | AJUSTE | RESERVA | CONSUMO | LIBERACAO)
+    +listarSaldos() +listarMovimentacoes()
+    +registrarMovimentacao()
+  }
+  class ServicoPedidos {
+    +criar()
+    +listar()
+    +obter()
+    +detalhar()
+    +exigirAcesso()
+  }
+  class CicloPedido {
+    +confirmarPagamento()
+    +mudarStatus()
+    +cancelar()
+    +expirarVencidos()
+  }
+  class ServicoPagamentos {
+    +pagar(ator, pedidoId, chave, cenario)
+    +obter() +listarDoPedido()
+    +reconciliar()
+  }
+  class ServicoIdempotencia {
+    +executarSincrono()
+    +consultar()
+    +iniciar()
+    +concluir()
+  }
+  class ServicoFidelidade {
+    +conceder() +revogar() +saldo() +historico()
+    +reservarResgate() +confirmarResgate()
+    +liberarResgate() +creditarEntrega()
+  }
+  class ServicoLgpd {
+    +anonimizar(usuarioId)
+  }
+  class Auditoria {
+    +registrar()
+    +listar()
+  }
+}
+
+package "domain (regras puras)" {
+  enum Papel {
+    ADMIN
+    GERENTE
+    ATENDENTE
+    COZINHA
+    CLIENTE
+  }
+  enum StatusPedido {
+    AGUARDANDO_PAGAMENTO
+    EM_PREPARO
+    PRONTO
+    ENTREGUE
+    CANCELADO
+  }
+  enum CanalPedido {
+    APP
+    TOTEM
+    BALCAO
+    PICKUP
+    WEB
+  }
+  class "maquina-estados.js" as Maquina {
+    +TRANSICOES
+    +validarTransicaoManual(de, para, papel)
+  }
+  class "fidelidade.js" as RegraFidelidade {
+    +pontosGanhos(centavos)
+    +valorDosPontos(pontos)
+    +descontoDoResgate(pontos, subtotal)
+  }
+  class "dinheiro.js" as Dinheiro <<centavos inteiros>>
+  class ErroNegocio {
+    tipo
+    codigo
+    detalhes
+  }
+}
+
+package "infrastructure" {
+  class "banco.js" as Banco {
+    +abrirBanco(arquivo)
+    +migrar(db)
+    +transacao(db, fn)  BEGIN IMMEDIATE
+  }
+  interface GatewayPagamento {
+    +autorizar(dados, signal)
+    +consultar(referencia, signal)
+  }
+  class GatewayMock
+  class "seguranca" as Seguranca {
+    senhas (bcrypt)
+    tokens (JWT)
+    limitador de login
+  }
+}
+
+App --> Rotas
+App ..> OpenApi
+Rotas ..> Validacao
+Rotas ..> Middlewares
+Rotas ..> HttpErros
+Rotas --> ServicoPedidos
+Rotas --> ServicoPagamentos
+Rotas --> CicloPedido
+Rotas --> ServicoFidelidade
+
+ServicoPedidos --> ServicoEstoque
+ServicoPedidos --> ServicoIdempotencia
+ServicoPedidos --> ServicoFidelidade
+ServicoPedidos ..> ServicoCardapio : preço do servidor
+CicloPedido --> ServicoEstoque
+CicloPedido --> ServicoFidelidade
+CicloPedido ..> Maquina
+ServicoPagamentos --> CicloPedido
+ServicoPagamentos --> ServicoIdempotencia
+ServicoPagamentos --> GatewayPagamento
+ServicoFidelidade ..> RegraFidelidade
+ServicoLgpd --> ServicoFidelidade
+ServicoUsuarios --> Seguranca
+
+GatewayMock ..|> GatewayPagamento
+ServicoPedidos --> Auditoria
+CicloPedido --> Auditoria
+ServicoPagamentos --> Auditoria
+ServicoLgpd --> Auditoria
+"application (casos de uso)" ..> Banco
+"application (casos de uso)" ..> ErroNegocio
+HttpErros ..> ErroNegocio
+@enduml

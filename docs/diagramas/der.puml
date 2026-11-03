@@ -1,0 +1,212 @@
+@startuml der
+title DER - banco SQLite (migrações 001 a 005)
+hide circle
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #FDFDFD
+  BorderColor #555555
+}
+
+entity unidades {
+  * id : INTEGER <<PK>>
+  --
+  * nome : TEXT <<UNIQUE>>
+  * cidade : TEXT
+  * ativa : INTEGER (0/1)
+  * criado_em, atualizado_em : TEXT
+}
+
+entity usuarios {
+  * id : INTEGER <<PK>>
+  --
+  * nome : TEXT
+  * email : TEXT <<UNIQUE>>
+  * senha_hash : TEXT (bcrypt)
+  * papel : TEXT (ADMIN, GERENTE, ATENDENTE, COZINHA, CLIENTE)
+  * ativo : INTEGER
+  anonimizado_em : TEXT
+  * criado_em, atualizado_em : TEXT
+}
+
+entity usuario_unidades {
+  * usuario_id : INTEGER <<PK, FK>>
+  * unidade_id : INTEGER <<PK, FK>>
+}
+
+entity produtos {
+  * id : INTEGER <<PK>>
+  --
+  * nome : TEXT <<UNIQUE>>
+  descricao : TEXT
+  * categoria : TEXT
+  * ativo : INTEGER
+}
+
+entity cardapio_itens {
+  * id : INTEGER <<PK>>
+  --
+  * unidade_id : INTEGER <<FK>>
+  * produto_id : INTEGER <<FK>>
+  * preco_centavos : INTEGER (> 0)
+  * disponivel : INTEGER
+  UNIQUE (unidade_id, produto_id)
+}
+
+entity estoques {
+  * unidade_id : INTEGER <<PK, FK>>
+  * produto_id : INTEGER <<PK, FK>>
+  --
+  * quantidade_total : INTEGER (>= 0)
+  * quantidade_reservada : INTEGER (>= 0, <= total)
+}
+
+entity estoque_movimentacoes {
+  * id : INTEGER <<PK>>
+  --
+  * unidade_id, produto_id : INTEGER <<FK estoques>>
+  * tipo : TEXT (ENTRADA, AJUSTE, RESERVA, CONSUMO, LIBERACAO)
+  * quantidade, total_apos, reservada_apos : INTEGER
+  usuario_id : INTEGER <<FK>>
+  pedido_id : INTEGER <<FK>>
+  motivo : TEXT
+  UNIQUE parcial (pedido_id, produto_id, tipo)
+}
+
+entity pedidos {
+  * id : INTEGER <<PK>>
+  --
+  * unidade_id : INTEGER <<FK>>
+  cliente_id : INTEGER <<FK usuarios>>
+  * criado_por_id : INTEGER <<FK usuarios>>
+  * canal_pedido : TEXT (APP, TOTEM, BALCAO, PICKUP, WEB)
+  * status : TEXT
+  * forma_pagamento : TEXT (MOCK)
+  * subtotal_centavos, desconto_centavos, total_centavos : INTEGER
+  CHECK total = subtotal - desconto
+  * reserva_estoque_status : TEXT (ATIVA, CONSUMIDA, LIBERADA)
+  * pontos_resgatados : INTEGER (múltiplo de 10)
+  resgate_status : TEXT (RESERVADO, CONFIRMADO, LIBERADO)
+  motivo_cancelamento : TEXT
+  * expira_em : TEXT
+  pago_em, pronto_em, entregue_em, cancelado_em : TEXT
+}
+
+entity pedido_itens {
+  * id : INTEGER <<PK>>
+  --
+  * pedido_id : INTEGER <<FK>>
+  * produto_id : INTEGER <<FK>>
+  * nome_produto : TEXT (cópia histórica)
+  * quantidade : INTEGER (1 a 99)
+  * preco_unitario_centavos : INTEGER (cópia histórica)
+  * total_centavos : INTEGER
+  UNIQUE (pedido_id, produto_id)
+}
+
+entity pagamentos {
+  * id : INTEGER <<PK>>
+  --
+  * pedido_id : INTEGER <<FK>>
+  * forma : TEXT
+  * valor_centavos : INTEGER
+  * status : TEXT (PROCESSANDO, APROVADO, RECUSADO, INDEFINIDO, APROVADO_TARDIO)
+  motivo_recusa : TEXT
+  * referencia_gateway : TEXT <<UNIQUE>>
+  codigo_autorizacao : TEXT
+  reconciliacao : TEXT
+  idempotencia_id : INTEGER <<FK>>
+  * solicitado_por_id : INTEGER <<FK usuarios>>
+  UNIQUE parcial (pedido_id) onde status vivo
+}
+
+entity pagamento_tentativas {
+  * id : INTEGER <<PK>>
+  --
+  * pagamento_id : INTEGER <<FK>>
+  * operacao : TEXT (AUTORIZACAO, CONSULTA)
+  * payload_requisicao : TEXT
+  payload_resposta : TEXT
+  resultado : TEXT
+  * iniciado_em : TEXT
+  finalizado_em : TEXT
+}
+
+entity idempotencia_registros {
+  * id : INTEGER <<PK>>
+  --
+  * usuario_id : INTEGER <<FK>>
+  * operacao : TEXT
+  * chave : TEXT
+  * hash_requisicao : TEXT (sha-256)
+  * estado : TEXT
+  status_http : INTEGER
+  corpo_resposta : TEXT
+  UNIQUE (usuario_id, operacao, chave)
+}
+
+entity consentimentos {
+  * id : INTEGER <<PK>>
+  --
+  * usuario_id : INTEGER <<FK>>
+  * finalidade : TEXT
+  * versao_termo : TEXT
+  * acao : TEXT (CONCEDIDO, REVOGADO)
+  * origem : TEXT (TITULAR, ANONIMIZACAO)
+  request_id : TEXT
+  somente inserção (triggers)
+}
+
+entity fidelidade_contas {
+  * usuario_id : INTEGER <<PK, FK>>
+  --
+  * saldo_pontos : INTEGER (>= 0)
+}
+
+entity fidelidade_lancamentos {
+  * id : INTEGER <<PK>>
+  --
+  * usuario_id : INTEGER <<FK>>
+  pedido_id : INTEGER <<FK>>
+  * tipo : TEXT (CREDITO, RESGATE, ESTORNO_RESGATE, BAIXA_ANONIMIZACAO)
+  * pontos, saldo_apos : INTEGER
+  * descricao : TEXT
+  UNIQUE parcial (pedido_id, tipo)
+}
+
+entity auditorias {
+  * id : INTEGER <<PK>>
+  --
+  ator_id : INTEGER <<FK usuarios>>
+  ator_papel : TEXT
+  * acao : TEXT
+  * recurso_tipo : TEXT
+  recurso_id : TEXT
+  unidade_id : INTEGER <<FK>>
+  * resultado : TEXT (SUCESSO, NEGADO)
+  * request_id : TEXT
+  detalhes : TEXT (JSON sem dado sensível)
+}
+
+usuarios ||--o{ usuario_unidades
+unidades ||--o{ usuario_unidades
+unidades ||--o{ cardapio_itens
+produtos ||--o{ cardapio_itens
+unidades ||--o{ estoques
+produtos ||--o{ estoques
+estoques ||--o{ estoque_movimentacoes
+unidades ||--o{ pedidos
+usuarios |o--o{ pedidos : cliente
+usuarios ||--o{ pedidos : criado por
+pedidos ||--|{ pedido_itens
+produtos ||--o{ pedido_itens
+pedidos ||--o{ pagamentos
+pagamentos ||--|{ pagamento_tentativas
+idempotencia_registros |o--o| pagamentos
+usuarios ||--o{ idempotencia_registros
+pedidos |o--o{ estoque_movimentacoes
+usuarios ||--o{ consentimentos
+usuarios ||--o| fidelidade_contas
+usuarios ||--o{ fidelidade_lancamentos
+pedidos |o--o{ fidelidade_lancamentos
+usuarios |o--o{ auditorias
+@enduml

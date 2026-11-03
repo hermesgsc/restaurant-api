@@ -1,0 +1,41 @@
+@startuml casos-de-uso-matriz
+title Casos de uso (3/3) - matriz e processos internos
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FDFDFD
+  BorderColor #555555
+}
+
+actor "Admin (matriz)" as Admin
+actor "Timer interno da API\n(PEDIDO_EXPIRACAO_INTERVALO_MS)" as Sistema <<sistema>>
+actor "Gateway de pagamento\n(simulado)" as Gateway <<sistema>>
+
+note "O admin atua em todas as unidades e também\nexecuta os casos de uso do gerente.\nUC16, UC19 e UC23 são comandos de terminal\nrodados pelo operador da matriz." as N1
+
+rectangle "API REST e comandos npm" {
+  usecase "UC05 Criar, editar e desativar unidades" as UC05
+  usecase "UC06 Manter produtos" as UC06
+  usecase "UC07 Definir cardápio de qualquer unidade" as UC07
+  usecase "UC09 Registrar entrada ou ajuste" as UC09
+  usecase "UC12 Consultar pedidos de todas as unidades" as UC12
+  usecase "UC24 Consultar trilha de auditoria" as UC24
+  usecase "UC23 Anonimizar titular\n(npm run lgpd:anonimizar)" as UC23
+  usecase "UC16 Expirar pedidos vencidos\n(npm run pedidos:expirar)" as UC16
+  usecase "UC19 Reconciliar pagamento indefinido\n(npm run pagamentos:reconciliar)" as UC19
+}
+
+Admin --> UC05
+Admin --> UC06
+Admin --> UC07
+Admin --> UC09
+Admin --> UC12
+Admin --> UC24
+Admin --> UC23
+
+Sistema --> UC16
+Admin --> UC16
+Admin --> UC19
+UC19 --> Gateway
+@enduml

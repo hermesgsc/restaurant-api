@@ -1,0 +1,68 @@
+@startuml sequencia-pedido-pagamento
+title Sequência - criar pedido e pagar (caminho aprovado)
+autonumber
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+
+actor Cliente
+participant "API (Express)" as API
+participant "ServicoPedidos" as Pedidos
+participant "ServicoEstoque" as Estoque
+participant "ServicoPagamentos" as Pagamentos
+participant "Gateway (mock)" as Gateway
+database "SQLite" as DB
+
+Cliente -> API : POST /pedidos\nAuthorization: Bearer, Idempotency-Key: k1\n{unidadeId, canalPedido, itens, pontosResgatar?}
+API -> API : valida JWT, papel e corpo (strictObject)
+API -> Pedidos : criar(ator, dados, k1)
+Pedidos -> DB : BEGIN IMMEDIATE
+Pedidos -> DB : busca registro de idempotência (usuário, CRIAR_PEDIDO, k1)
+alt chave já usada com o mesmo hash
+  Pedidos --> API : resposta original (Idempotent-Replayed: true)
+else chave nova
+  Pedidos -> DB : preços do cardápio da unidade (cliente não envia preço)
+  Pedidos -> DB : INSERT pedido + itens (preço histórico)
+  Pedidos -> Estoque : reservar(itens)
+  Estoque -> DB : UPDATE estoques SET reservada = reservada + q\nWHERE total - reservada >= q
+  note right : se 0 linhas: 409 ESTOQUE_INSUFICIENTE\ne rollback de tudo
+  opt pontosResgatar
+    Pedidos -> DB : debita pontos (UPDATE condicionado ao saldo)
+  end
+  Pedidos -> DB : grava resposta na idempotência + auditoria
+  Pedidos -> DB : COMMIT
+  Pedidos --> API : 201 pedido AGUARDANDO_PAGAMENTO
+end
+API --> Cliente : 201 Location: /pedidos/{id}
+
+Cliente -> API : POST /pedidos/{id}/pagamentos\nIdempotency-Key: k2
+API -> Pagamentos : pagar(ator, id, k2)
+group fase 1 (transação curta)
+  Pagamentos -> DB : BEGIN IMMEDIATE
+  Pagamentos -> DB : confere status e pagamento vivo
+  Pagamentos -> DB : INSERT pagamento PROCESSANDO\n(índice único parcial: um vivo por pedido)
+  Pagamentos -> DB : idempotência k2 = EM_PROCESSAMENTO
+  Pagamentos -> DB : COMMIT
+end
+Pagamentos -> Gateway : autorizar(referência, valor) com timeout
+note over Pagamentos, Gateway : chamada fora de transação:\no banco não fica travado esperando a rede
+Gateway --> Pagamentos : APROVADO, código de autorização
+group fase 2 (transação curta)
+  Pagamentos -> DB : BEGIN IMMEDIATE
+  Pagamentos -> DB : UPDATE pagamento APROVADO WHERE status = PROCESSANDO
+  Pagamentos -> DB : UPDATE pedido EM_PREPARO WHERE status = AGUARDANDO_PAGAMENTO
+  Pagamentos -> DB : reserva vira CONSUMO; resgate CONFIRMADO
+  Pagamentos -> DB : idempotência k2 = CONCLUIDO + auditoria
+  Pagamentos -> DB : COMMIT
+end
+Pagamentos --> API : 201 {pagamento, pedido}
+API --> Cliente : 201
+
+== preparo e entrega ==
+actor Cozinha
+actor Atendente
+Cozinha -> API : PATCH /pedidos/{id}/status {PRONTO}
+API --> Cozinha : 200
+Atendente -> API : PATCH /pedidos/{id}/status {ENTREGUE}
+API -> DB : UPDATE ... WHERE status = PRONTO\n+ crédito de pontos (único por pedido)
+API --> Atendente : 200
+@enduml

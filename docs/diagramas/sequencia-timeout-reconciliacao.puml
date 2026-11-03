@@ -1,0 +1,43 @@
+@startuml sequencia-timeout-reconciliacao
+title Sequência - timeout do gateway e reconciliação
+autonumber
+skinparam responseMessageBelowArrow true
+
+actor Cliente
+participant "API" as API
+participant "ServicoPagamentos" as Pagamentos
+participant "Gateway (mock)" as Gateway
+database "SQLite" as DB
+participant "npm run pagamentos:reconciliar" as Reconciliar
+
+Cliente -> API : POST /pedidos/{id}/pagamentos (k1)
+API -> Pagamentos : pagar
+Pagamentos -> DB : fase 1: pagamento PROCESSANDO
+Pagamentos -> Gateway : autorizar (timeout = PAGAMENTO_TIMEOUT_MS)
+... sem resposta dentro do prazo ...
+Pagamentos -> Pagamentos : AbortController cancela a espera
+Pagamentos -> DB : fase 2: pagamento INDEFINIDO\npedido continua AGUARDANDO_PAGAMENTO, estoque segue reservado
+Pagamentos --> API : 202 INDEFINIDO
+API --> Cliente : 202 (não cobrar de novo)
+
+Cliente -> API : retry com a mesma chave k1
+API --> Cliente : 202 INDEFINIDO, Idempotent-Replayed: true\n(o gateway não é chamado de novo)
+Cliente -> API : nova chave k2
+API --> Cliente : 409 PAGAMENTO_INDEFINIDO
+note right of API : a expiração só pula pagamento PROCESSANDO;\nse o pedido INDEFINIDO vencer, ele é cancelado\ne uma aprovação posterior vira APROVADO_TARDIO
+
+Reconciliar -> Pagamentos : reconciliar()
+Pagamentos -> DB : busca INDEFINIDO e PROCESSANDO antigos
+Pagamentos -> Gateway : consultar(referência)
+alt gateway confirma APROVADO e pedido ainda aguardando
+  Pagamentos -> DB : pagamento APROVADO, pedido EM_PREPARO, estoque consumido
+else gateway confirma APROVADO mas o pedido já foi cancelado
+  Pagamentos -> DB : pagamento APROVADO_TARDIO\nreconciliacao = ESTORNO_MANUAL_PENDENTE
+else gateway responde RECUSADO
+  Pagamentos -> DB : pagamento RECUSADO, pedido CANCELADO,\nestoque e pontos liberados
+else gateway continua sem responder
+  Pagamentos -> DB : continua INDEFINIDO (próxima rodada)
+end
+Cliente -> API : retry com k1
+API --> Cliente : 201 com o resultado final
+@enduml

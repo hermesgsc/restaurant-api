@@ -1,0 +1,48 @@
+@startuml casos-de-uso-cliente
+title Casos de uso (1/3) - visitante e cliente
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FDFDFD
+  BorderColor #555555
+}
+
+actor "Visitante" as Visitante
+actor "Cliente" as Cliente
+actor "Gateway de pagamento\n(simulado)" as Gateway <<sistema>>
+
+Visitante <|-- Cliente
+
+rectangle "API REST" {
+  usecase "UC01 Cadastrar-se como cliente" as UC01
+  usecase "UC02 Fazer login (JWT)" as UC02
+  usecase "UC04 Consultar unidades e cardápio" as UC04
+  usecase "UC03 Consultar o próprio perfil" as UC03
+  usecase "UC10 Criar pedido\n(APP, TOTEM, PICKUP, WEB)" as UC10
+  usecase "Reservar estoque" as Reservar
+  usecase "UC22 Resgatar pontos no pedido" as UC22
+  usecase "UC12 Consultar os próprios pedidos" as UC12
+  usecase "UC15 Cancelar pedido não pago" as UC15
+  usecase "UC17 Pagar pedido" as UC17
+  usecase "UC18 Consultar pagamento" as UC18
+  usecase "UC20 Dar ou revogar consentimento" as UC20
+  usecase "UC21 Consultar saldo e extrato de pontos" as UC21
+}
+
+Visitante --> UC01
+Visitante --> UC02
+Visitante --> UC04
+Cliente --> UC03
+Cliente --> UC10
+Cliente --> UC12
+Cliente --> UC15
+Cliente --> UC17
+Cliente --> UC18
+Cliente --> UC20
+Cliente --> UC21
+
+UC10 ..> Reservar : <<include>>
+UC22 ..> UC10 : <<extend>>
+UC17 --> Gateway
+@enduml

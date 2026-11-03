@@ -1,0 +1,58 @@
+@startuml casos-de-uso-unidade
+title Casos de uso (2/3) - operação da unidade
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FDFDFD
+  BorderColor #555555
+}
+
+actor "Atendente" as Atendente
+actor "Cozinha" as Cozinha
+actor "Gerente" as Gerente
+actor "Gateway de pagamento\n(simulado)" as Gateway <<sistema>>
+
+note "Atendente, cozinha e gerente só atuam\nnas unidades a que estão vinculados." as N1
+
+rectangle "API REST" {
+  usecase "UC11 Registrar pedido de balcão" as UC11
+  usecase "Reservar estoque" as Reservar
+  usecase "UC17 Pagar pedido" as UC17
+  usecase "UC15 Cancelar pedido não pago" as UC15
+  usecase "UC12 Consultar e filtrar pedidos\nda unidade" as UC12
+  usecase "UC13 Marcar pedido como PRONTO" as UC13
+  usecase "UC14 Marcar pedido como ENTREGUE" as UC14
+  usecase "Creditar pontos na entrega" as Creditar
+  usecase "UC08 Consultar saldo de estoque" as UC08
+  usecase "UC09 Registrar entrada ou ajuste" as UC09
+  usecase "UC05 Editar dados da unidade" as UC05
+  usecase "UC07 Definir preço e disponibilidade\nno cardápio da unidade" as UC07
+  usecase "UC24 Consultar auditoria da unidade" as UC24
+}
+
+Atendente --> UC11
+Atendente --> UC17
+Atendente --> UC15
+Atendente --> UC12
+Atendente --> UC14
+Atendente --> UC08
+
+Cozinha --> UC12
+Cozinha --> UC13
+Cozinha --> UC08
+
+Gerente --> UC12
+Gerente --> UC13
+Gerente --> UC14
+Gerente --> UC15
+Gerente --> UC08
+Gerente --> UC09
+Gerente --> UC05
+Gerente --> UC07
+Gerente --> UC24
+
+UC11 ..> Reservar : <<include>>
+UC14 ..> Creditar : <<include>>
+UC17 --> Gateway
+@enduml
