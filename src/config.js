@@ -40,6 +40,15 @@ function opcao(env, nome, padrao, opcoes) {
   return valor;
 }
 
+// validade do token no formato do jsonwebtoken. numero puro e lido em segundos;
+// passado como string o jsonwebtoken entenderia milissegundos
+function duracao(env, nome, padrao) {
+  const valor = env[nome] || padrao;
+  if (/^\d+$/.test(valor)) return Number(valor);
+  if (/^\d+[smhd]$/.test(valor)) return valor;
+  throw new ErroConfiguracao(`${nome} deve ser um numero de segundos ou um valor como 30m, 1h ou 7d.`);
+}
+
 // le o .env e as variaveis do processo (o processo ganha). os testes passam
 // `sobrescrever` pra isolar banco e segredo. sem JWT_SECRET a api nem sobe.
 export function carregarConfig(sobrescrever = {}, { lerEnv = true } = {}) {
@@ -59,7 +68,7 @@ export function carregarConfig(sobrescrever = {}, { lerEnv = true } = {}) {
     ambiente,
     porta: inteiro(env, 'PORT', 3000, 0, 65535),
     arquivoBanco: arquivoBanco === ':memory:' ? arquivoBanco : path.resolve(raiz, arquivoBanco),
-    jwt: Object.freeze({ segredo, expiracao: env.JWT_EXPIRACAO || '1h' }),
+    jwt: Object.freeze({ segredo, expiracao: duracao(env, 'JWT_EXPIRACAO', '1h') }),
     bcryptCusto: inteiro(env, 'BCRYPT_CUSTO', 11, 4, 14),
     login: Object.freeze({
       maxTentativas: inteiro(env, 'LOGIN_MAX_TENTATIVAS', 5, 1, 1000),
