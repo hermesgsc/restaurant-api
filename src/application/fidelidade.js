@@ -169,7 +169,7 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
   }
 
   return {
-    conceder, revogar, saldo, historico, consentimentoAtivo,
+    conceder, revogar, saldo, historico,
     reservarResgate, confirmarResgate, liberarResgate, creditarEntrega, encerrarParaAnonimizacao,
   };
 }

@@ -11,7 +11,7 @@ function canonico(valor) {
   return JSON.stringify(valor ?? null);
 }
 
-export function hashRequisicao(dados) {
+function hashRequisicao(dados) {
   return crypto.createHash('sha256').update(canonico(dados)).digest('hex');
 }
 

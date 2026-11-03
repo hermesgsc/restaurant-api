@@ -2,7 +2,6 @@ import { ErroNegocio, TipoErro } from '../domain/erros.js';
 
 const STATUS_POR_TIPO = {
   [TipoErro.VALIDACAO]: 422,
-  [TipoErro.REQUISICAO_INVALIDA]: 400,
   [TipoErro.NAO_AUTENTICADO]: 401,
   [TipoErro.PROIBIDO]: 403,
   [TipoErro.NAO_ENCONTRADO]: 404,

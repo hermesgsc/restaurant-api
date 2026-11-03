@@ -16,10 +16,3 @@ export function multiplicar(centavos, quantidade) {
 export function somar(valores) {
   return valores.reduce((acc, v) => validarCentavos(acc + validarCentavos(v)), 0);
 }
-
-export function formatarBRL(centavos) {
-  validarCentavos(centavos);
-  const reais = Math.trunc(centavos / 100);
-  const resto = String(centavos % 100).padStart(2, '0');
-  return `R$ ${reais},${resto}`;
-}

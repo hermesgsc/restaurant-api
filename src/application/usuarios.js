@@ -80,5 +80,5 @@ export function criarServicoUsuarios({ db, senhas, tokens, limitador, auditoria 
     return paraUsuarioPublico(buscarPorId.get(ator.id), ator.unidadeIds);
   }
 
-  return { carregarAtor, cadastrarCliente, login, perfil, buscarPorId: (id) => buscarPorId.get(id) };
+  return { carregarAtor, cadastrarCliente, login, perfil };
 }
