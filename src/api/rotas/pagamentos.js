@@ -1,9 +1,7 @@
 import { Router } from 'express';
-import { esquemaId, validar, z } from '../validacao.js';
+import { esquemaId, lerChaveIdempotencia, marcarRepeticao, validar, z } from '../validacao.js';
 import { erros } from '../../domain/erros.js';
-import { lerChaveIdempotencia } from './pedidos.js';
-
-const CENARIOS_MOCK = ['APROVAR', 'RECUSAR', 'TIMEOUT'];
+import { CENARIOS_MOCK } from '../../infrastructure/pagamento/gateway-mock.js';
 
 // o corpo e vazio de proposito: valor e forma vem do pedido no servidor
 const corpoPagamento = z.strictObject({});
@@ -36,7 +34,7 @@ export function rotasPagamentos({ config, servicos, autenticar }) {
     const chave = lerChaveIdempotencia(req);
     const cenario = lerCenario(req, config);
     const resultado = await servicos.pagamentos.pagar(req.ator, id, { chave, cenario, requestId: req.requestId });
-    if (resultado.repetida) res.set('Idempotent-Replayed', 'true');
+    marcarRepeticao(res, resultado);
     res.status(resultado.status).location(`/pagamentos/${resultado.corpo.pagamento.id}`).json(resultado.corpo);
   });
 

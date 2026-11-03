@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { CENARIOS_MOCK } from './infrastructure/pagamento/gateway-mock.js';
 
 export class ErroConfiguracao extends Error {}
 
@@ -80,7 +81,7 @@ export function carregarConfig(sobrescrever = {}, { lerEnv = true } = {}) {
     pagamentoTimeoutMs: inteiro(env, 'PAGAMENTO_TIMEOUT_MS', 3000, 50, 60000),
     mockPagamento: Object.freeze({
       latenciaMs: inteiro(env, 'MOCK_PAGAMENTO_LATENCIA_MS', 50, 0, 60000),
-      cenarioPadrao: opcao(env, 'MOCK_PAGAMENTO_CENARIO_PADRAO', 'APROVAR', ['APROVAR', 'RECUSAR', 'TIMEOUT']),
+      cenarioPadrao: opcao(env, 'MOCK_PAGAMENTO_CENARIO_PADRAO', 'APROVAR', CENARIOS_MOCK),
       // seletor de cenario e coisa do mock, em producao fica sempre desligado
       permitirCenario: ambiente === 'production' ? false : permitirCenario,
       resultadoConsulta: opcao(env, 'MOCK_PAGAMENTO_RESULTADO_CONSULTA', 'APROVADO', ['APROVADO', 'RECUSADO', 'TIMEOUT']),

@@ -4,15 +4,8 @@ import { chamarComTimeout, TimeoutGateway } from '../infrastructure/pagamento/ga
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 import { StatusPedido } from '../domain/pedido.js';
+import { STATUS_PAGAMENTO_VIVO, StatusPagamento } from '../domain/pagamento.js';
 import { MotivoCancelamento } from './ciclo-pedido.js';
-
-export const StatusPagamento = Object.freeze({
-  PROCESSANDO: 'PROCESSANDO',
-  APROVADO: 'APROVADO',
-  RECUSADO: 'RECUSADO',
-  INDEFINIDO: 'INDEFINIDO',
-  APROVADO_TARDIO: 'APROVADO_TARDIO',
-});
 
 // status http da resposta de POST /pedidos/{id}/pagamentos. recusa de negocio
 // nao e erro de transporte: o pagamento foi registrado, so que recusado.
@@ -52,7 +45,7 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
   const buscarTentativas = db.prepare('SELECT * FROM pagamento_tentativas WHERE pagamento_id = ? ORDER BY id');
   const buscarPorIdempotencia = db.prepare('SELECT id, status FROM pagamentos WHERE idempotencia_id = ?');
   const buscarDoPedido = db.prepare('SELECT * FROM pagamentos WHERE pedido_id = ? ORDER BY id');
-  const pagamentoVivo = db.prepare("SELECT * FROM pagamentos WHERE pedido_id = ? AND status IN ('PROCESSANDO', 'INDEFINIDO', 'APROVADO')");
+  const pagamentoVivo = db.prepare(`SELECT * FROM pagamentos WHERE pedido_id = ? AND status IN (${STATUS_PAGAMENTO_VIVO.map(() => '?').join(',')})`);
   const inserirTentativa = db.prepare(`INSERT INTO pagamento_tentativas (pagamento_id, operacao, payload_requisicao, iniciado_em)
     VALUES (?, ?, ?, ?)`);
   const fecharTentativa = db.prepare('UPDATE pagamento_tentativas SET resultado = ?, payload_resposta = ?, finalizado_em = ? WHERE id = ?');
@@ -75,7 +68,7 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
     if (linha.status !== StatusPedido.AGUARDANDO_PAGAMENTO) {
       throw erros.conflito('PEDIDO_JA_PAGO', 'O pedido ja tem pagamento confirmado.', [{ field: 'status', issue: `Status atual: ${linha.status}` }]);
     }
-    const vivo = pagamentoVivo.get(linha.id);
+    const vivo = pagamentoVivo.get(linha.id, ...STATUS_PAGAMENTO_VIVO);
     if (vivo?.status === StatusPagamento.PROCESSANDO) {
       throw erros.conflito('PAGAMENTO_EM_ANDAMENTO', 'Ja existe um pagamento em processamento para este pedido.', [{ field: 'pagamentoId', issue: String(vivo.id) }]);
     }
@@ -202,12 +195,8 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
 
     const retorno = await chamarGateway('autorizar', { referencia: intencao.referencia, valorCentavos: intencao.valorCentavos, cenario });
     const status = finalizar(intencao.pagamentoId, intencao.tentativaId, retorno, { ator, requestId });
-    const corpo = respostaPagamento(intencao.pagamentoId);
-    if (status === StatusPagamento.INDEFINIDO) {
-      // timeout: a chave continua EM_PROCESSAMENTO ate a reconciliacao decidir
-      return { status: 202, corpo, repetida: false };
-    }
-    return { status: STATUS_HTTP[status], corpo, repetida: false };
+    // no timeout (INDEFINIDO, 202) a chave continua EM_PROCESSAMENTO ate a reconciliacao decidir
+    return { status: STATUS_HTTP[status], corpo: respostaPagamento(intencao.pagamentoId), repetida: false };
   }
 
   function obter(ator, id, requestId) {
@@ -227,7 +216,7 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
   async function reconciliar({ idadeMinimaMs = config.pagamentoTimeoutMs * 2 } = {}) {
     const limite = new Date(Date.now() - idadeMinimaMs).toISOString();
     const pendentes = db.prepare(`SELECT id, referencia_gateway FROM pagamentos
-      WHERE status = 'INDEFINIDO' OR (status = 'PROCESSANDO' AND atualizado_em <= ?) ORDER BY id`).all(limite);
+      WHERE status = ? OR (status = ? AND atualizado_em <= ?) ORDER BY id`).all(StatusPagamento.INDEFINIDO, StatusPagamento.PROCESSANDO, limite);
     const resumo = { verificados: pendentes.length, resultados: {} };
     for (const p of pendentes) {
       const tentativaId = transacao(db, () => Number(inserirTentativa.run(

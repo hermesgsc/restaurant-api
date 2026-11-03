@@ -3,6 +3,7 @@ import { erros } from '../domain/erros.js';
 import { ehFuncionario, Papel } from '../domain/papeis.js';
 import { TipoMovimento } from '../domain/estoque.js';
 import { ReservaEstoque, StatusPedido } from '../domain/pedido.js';
+import { STATUS_PAGAMENTO_VIVO, StatusPagamento } from '../domain/pagamento.js';
 import { validarTransicaoManual } from '../domain/maquina-estados.js';
 
 export const MotivoCancelamento = Object.freeze({
@@ -16,7 +17,7 @@ export const MotivoCancelamento = Object.freeze({
 // correrem juntos, so o primeiro muda a linha e os outros veem changes = 0.
 export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }) {
   const buscarItens = db.prepare('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? ORDER BY id');
-  const pagamentoVivo = db.prepare("SELECT id, status FROM pagamentos WHERE pedido_id = ? AND status IN ('PROCESSANDO', 'INDEFINIDO', 'APROVADO')");
+  const pagamentoVivo = db.prepare(`SELECT id, status FROM pagamentos WHERE pedido_id = ? AND status IN (${STATUS_PAGAMENTO_VIVO.map(() => '?').join(',')})`);
 
   function movimentarItens(pedido, tipo, usuarioId) {
     for (const item of buscarItens.all(pedido.id)) {
@@ -72,8 +73,8 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }
           { field: 'status', issue: `Status atual: ${atual.status}` },
         ]);
       }
-      const vivo = pagamentoVivo.get(pedidoId);
-      if (vivo?.status === 'PROCESSANDO') {
+      const vivo = pagamentoVivo.get(pedidoId, ...STATUS_PAGAMENTO_VIVO);
+      if (vivo?.status === StatusPagamento.PROCESSANDO) {
         throw erros.conflito('PAGAMENTO_EM_ANDAMENTO', 'Ha um pagamento em processamento. Aguarde o resultado antes de cancelar.');
       }
       cancelarNoBanco(pedidoId, MotivoCancelamento.SOLICITADO, { ator, requestId, detalhe: motivo });
@@ -107,8 +108,8 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }
   function expirarVencidos(instante = agora()) {
     const vencidos = db.prepare(`SELECT p.id FROM pedidos p
       WHERE p.status = ? AND p.expira_em <= ?
-        AND NOT EXISTS (SELECT 1 FROM pagamentos g WHERE g.pedido_id = p.id AND g.status = 'PROCESSANDO')
-      ORDER BY p.id`).all(StatusPedido.AGUARDANDO_PAGAMENTO, instante);
+        AND NOT EXISTS (SELECT 1 FROM pagamentos g WHERE g.pedido_id = p.id AND g.status = ?)
+      ORDER BY p.id`).all(StatusPedido.AGUARDANDO_PAGAMENTO, instante, StatusPagamento.PROCESSANDO);
     let expirados = 0;
     for (const { id } of vencidos) {
       if (transacao(db, () => cancelarNoBanco(id, MotivoCancelamento.EXPIRADO, { requestId: 'expiracao-automatica' }))) expirados += 1;
@@ -120,7 +121,7 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }
     const linha = pedidos.obterLinha(pedidoId);
     if (linha.status !== StatusPedido.AGUARDANDO_PAGAMENTO || linha.expira_em > agora()) return false;
     return transacao(db, () => {
-      if (pagamentoVivo.get(pedidoId)?.status === 'PROCESSANDO') return false;
+      if (pagamentoVivo.get(pedidoId, ...STATUS_PAGAMENTO_VIVO)?.status === StatusPagamento.PROCESSANDO) return false;
       return cancelarNoBanco(pedidoId, MotivoCancelamento.EXPIRADO, { requestId: 'expiracao-automatica' });
     });
   }

@@ -1,9 +1,6 @@
 import { Router } from 'express';
-import { esquemaId, idParam, paginacao, validar, z } from '../validacao.js';
-import { erros } from '../../domain/erros.js';
+import { esquemaId, idParam, lerChaveIdempotencia, marcarRepeticao, paginacao, validar, z } from '../validacao.js';
 import { CANAIS_PEDIDO, LIMITES_PEDIDO, STATUS_PEDIDO } from '../../domain/pedido.js';
-
-const CHAVE_VALIDA = /^[A-Za-z0-9._:-]{8,100}$/;
 
 // strictObject barra precoCentavos, totalCentavos, desconto ou status no corpo
 const novoPedido = z.strictObject({
@@ -29,16 +26,6 @@ const filtrosPedidos = z.strictObject({
 const novoStatus = z.strictObject({ status: z.enum(['PRONTO', 'ENTREGUE']) });
 const cancelamento = z.strictObject({ motivo: z.string().trim().min(3).max(200).optional() });
 
-export function lerChaveIdempotencia(req) {
-  const chave = req.get('idempotency-key');
-  if (!chave || !CHAVE_VALIDA.test(chave)) {
-    throw erros.validacao('IDEMPOTENCY_KEY_INVALIDA', 'Envie o cabecalho Idempotency-Key com 8 a 100 caracteres (letras, numeros, . _ : -).', [
-      { field: 'Idempotency-Key', issue: chave ? 'Formato invalido.' : 'Cabecalho obrigatorio.' },
-    ]);
-  }
-  return chave;
-}
-
 export function rotasPedidos({ servicos, autenticar }) {
   const r = Router();
 
@@ -46,7 +33,7 @@ export function rotasPedidos({ servicos, autenticar }) {
     const dados = validar(novoPedido, req.body);
     const chave = lerChaveIdempotencia(req);
     const resultado = servicos.pedidos.criar(req.ator, dados, { chave, requestId: req.requestId });
-    if (resultado.repetida) res.set('Idempotent-Replayed', 'true');
+    marcarRepeticao(res, resultado);
     res.status(resultado.status).location(`/pedidos/${resultado.corpo.id}`).json(resultado.corpo);
   });
 

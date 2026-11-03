@@ -63,3 +63,20 @@ export const paginacao = {
 };
 
 export const booleanoQuery = z.enum(['true', 'false']).transform((v) => v === 'true');
+
+const CHAVE_VALIDA = /^[A-Za-z0-9._:-]{8,100}$/;
+
+export function lerChaveIdempotencia(req) {
+  const chave = req.get('idempotency-key');
+  if (!chave || !CHAVE_VALIDA.test(chave)) {
+    throw erros.validacao('IDEMPOTENCY_KEY_INVALIDA', 'Envie o cabecalho Idempotency-Key com 8 a 100 caracteres (letras, numeros, . _ : -).', [
+      { field: 'Idempotency-Key', issue: chave ? 'Formato invalido.' : 'Cabecalho obrigatorio.' },
+    ]);
+  }
+  return chave;
+}
+
+// resposta que veio de uma requisicao anterior com a mesma chave
+export function marcarRepeticao(res, resultado) {
+  if (resultado.repetida) res.set('Idempotent-Replayed', 'true');
+}

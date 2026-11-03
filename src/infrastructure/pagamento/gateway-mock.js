@@ -1,5 +1,14 @@
 import crypto from 'node:crypto';
 
+export const CENARIOS_MOCK = Object.freeze(['APROVAR', 'RECUSAR', 'TIMEOUT']);
+
+// espera de um dia: na pratica o mock nunca responde e quem chamou desiste pelo timeout
+const NUNCA_MS = 24 * 60 * 60 * 1000;
+
+function codigoAutorizacao() {
+  return `MOCK-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+}
+
 // adaptador simulado do gateway. segue o mesmo contrato que um gateway real
 // seguiria (ver gateway.js), sem rede, sem cartao e sem credencial.
 // o cenario (APROVAR, RECUSAR, TIMEOUT) e escolhido pela configuracao ou pelo
@@ -19,8 +28,7 @@ export function criarGatewayMock({ latenciaMs, cenarioPadrao, resultadoConsulta 
     async autorizar({ referencia, valorCentavos, cenario }, { signal } = {}) {
       const escolhido = cenario ?? cenarioPadrao;
       if (escolhido === 'TIMEOUT') {
-        // nunca responde: quem chamou desiste pelo proprio timeout
-        await esperar(24 * 60 * 60 * 1000, signal);
+        await esperar(NUNCA_MS, signal);
       }
       await esperar(latenciaMs, signal);
       if (escolhido === 'RECUSAR') {
@@ -30,7 +38,7 @@ export function criarGatewayMock({ latenciaMs, cenarioPadrao, resultadoConsulta 
         status: 'APROVADO',
         referencia,
         valorCentavos,
-        codigoAutorizacao: `MOCK-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
+        codigoAutorizacao: codigoAutorizacao(),
         mock: true,
       };
     },
@@ -40,9 +48,9 @@ export function criarGatewayMock({ latenciaMs, cenarioPadrao, resultadoConsulta 
     // MOCK_PAGAMENTO_RESULTADO_CONSULTA, o que deixa o teste deterministico
     async consultar({ referencia }, { signal } = {}) {
       await esperar(latenciaMs, signal);
-      if (resultadoConsulta === 'TIMEOUT') await esperar(24 * 60 * 60 * 1000, signal);
+      if (resultadoConsulta === 'TIMEOUT') await esperar(NUNCA_MS, signal);
       if (resultadoConsulta === 'RECUSADO') return { status: 'RECUSADO', referencia, motivo: 'RECUSA_SIMULADA_NA_CONSULTA', mock: true };
-      return { status: 'APROVADO', referencia, codigoAutorizacao: `MOCK-${crypto.randomBytes(4).toString('hex').toUpperCase()}`, mock: true };
+      return { status: 'APROVADO', referencia, codigoAutorizacao: codigoAutorizacao(), mock: true };
     },
   };
 }
