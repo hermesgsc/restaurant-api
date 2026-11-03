@@ -140,6 +140,50 @@
           }
         },
         {
+          "name": "Cadastro com e-mail invalido e senha curta (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('envelope de erro VALIDACAO', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('VALIDACAO');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});",
+                  "pm.test('aponta os dois campos', () => pm.expect(pm.response.json().details.map((d) => d.field)).to.include.members(['email', 'senha']));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/usuarios",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Postman\",\n  \"email\": \"sem-arroba\",\n  \"senha\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Login do cliente",
           "event": [
             {
@@ -367,6 +411,44 @@
           }
         },
         {
+          "name": "Login de outro cliente (seed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('token bearer', () => pm.expect(pm.response.json().tokenType).to.eql('Bearer'));",
+                  "pm.collectionVariables.set('tokenOutroCliente', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailOutroCliente}}\",\n  \"senha\": \"{{senhaDemo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Login com senha errada (401)",
           "event": [
             {
@@ -486,6 +568,7 @@
                   "pm.test('item indisponivel nao aparece', () => pm.expect(item('Combo Classico')).to.be.undefined);",
                   "pm.collectionVariables.set('produtoXBurgerId', item('X-Burger').produtoId);",
                   "pm.collectionVariables.set('produtoRefriId', item('Refrigerante Lata').produtoId);",
+                  "pm.collectionVariables.set('produtoBatataId', item('Batata Frita').produtoId);",
                   "pm.collectionVariables.set('precoXBurgerCentro', item('X-Burger').precoCentavos);",
                   "pm.collectionVariables.set('precoRefriCentro', item('Refrigerante Lata').precoCentavos);"
                 ]
@@ -1318,6 +1401,388 @@
           }
         },
         {
+          "name": "Pedido sem canalPedido (422)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('envelope de erro VALIDACAO', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('VALIDACAO');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});",
+                  "pm.test('campo canalPedido obrigatorio', () => pm.expect(pm.response.json().details).to.deep.include({ field: 'canalPedido', issue: 'Campo obrigatorio.' }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": {{unidadeCentroId}},\n  \"formaPagamento\": \"MOCK\",\n  \"itens\": [\n    {\n      \"produtoId\": {{produtoXBurgerId}},\n      \"quantidade\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Canal fora da lista (422)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('envelope de erro VALIDACAO', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('VALIDACAO');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});",
+                  "pm.test('lista os canais aceitos', () => pm.expect(pm.response.json().details[0].issue).to.include('APP, TOTEM, BALCAO, PICKUP, WEB'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": {{unidadeCentroId}},\n  \"canalPedido\": \"DRIVE_THRU\",\n  \"formaPagamento\": \"MOCK\",\n  \"itens\": [\n    {\n      \"produtoId\": {{produtoXBurgerId}},\n      \"quantidade\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Quantidade fracionada (422)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('envelope de erro VALIDACAO', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('VALIDACAO');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});",
+                  "pm.test('campo da quantidade', () => pm.expect(pm.response.json().details[0].field).to.eql('itens[0].quantidade'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": {{unidadeCentroId}},\n  \"canalPedido\": \"APP\",\n  \"formaPagamento\": \"MOCK\",\n  \"itens\": [\n    {\n      \"produtoId\": {{produtoXBurgerId}},\n      \"quantidade\": 1.5\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Produto inexistente (404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('envelope de erro PRODUTO_NAO_ENCONTRADO', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('PRODUTO_NAO_ENCONTRADO');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": {{unidadeCentroId}},\n  \"canalPedido\": \"APP\",\n  \"formaPagamento\": \"MOCK\",\n  \"itens\": [\n    {\n      \"produtoId\": 999999,\n      \"quantidade\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unidade inexistente (404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('envelope de erro UNIDADE_NAO_ENCONTRADA', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('UNIDADE_NAO_ENCONTRADA');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": 999999,\n  \"canalPedido\": \"APP\",\n  \"formaPagamento\": \"MOCK\",\n  \"itens\": [\n    {\n      \"produtoId\": {{produtoXBurgerId}},\n      \"quantidade\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Estoque insuficiente (409)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('envelope de erro ESTOQUE_INSUFICIENTE', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('ESTOQUE_INSUFICIENTE');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});",
+                  "pm.test('aponta o item sem saldo', () => pm.expect(pm.response.json().details[0].field).to.eql('itens[0].quantidade'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": {{unidadeCentroId}},\n  \"canalPedido\": \"APP\",\n  \"formaPagamento\": \"MOCK\",\n  \"itens\": [\n    {\n      \"produtoId\": {{produtoBatataId}},\n      \"quantidade\": 99\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Detalhar pedido",
           "event": [
             {
@@ -1432,6 +1897,39 @@
                   "language": "json"
                 }
               }
+            }
+          }
+        },
+        {
+          "name": "Atendente filtra pedidos por canal BALCAO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const dados = pm.response.json().dados;",
+                  "pm.test('so BALCAO da unidade', () => pm.expect(dados.every((p) => p.canalPedido === 'BALCAO' && p.unidadeId === Number(pm.collectionVariables.get('unidadeCentroId')))).to.be.true);",
+                  "pm.test('inclui o pedido de balcao criado', () => pm.expect(dados.map((p) => p.id)).to.include(Number(pm.collectionVariables.get('pedidoBalcaoId'))));",
+                  "pm.test('nao inclui o pedido do APP', () => pm.expect(dados.map((p) => p.id)).to.not.include(Number(pm.collectionVariables.get('pedidoId'))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/pedidos?canalPedido=BALCAO&unidadeId={{unidadeCentroId}}&limit=20",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAtendenteCentro}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -3022,6 +3520,42 @@
                 {
                   "key": "token",
                   "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Outro cliente nao ve o pedido (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('envelope de erro ACESSO_NEGADO', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('ACESSO_NEGADO');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOutroCliente}}",
                   "type": "string"
                 }
               ]

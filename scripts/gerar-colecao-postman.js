@@ -57,6 +57,15 @@ const login = (nome, email, variavel) => requisicao(nome, 'POST', '/auth/login',
 
 const pedidoCentro = (itens, extra = {}) => ({ unidadeId: '#unidadeCentroId', canalPedido: 'APP', formaPagamento: 'MOCK', ...extra, itens });
 
+// pedido do cliente que deve ser recusado, sempre com chave nova
+const pedidoInvalido = (nome, corpo, testes) => requisicao(nome, 'POST', '/pedidos', {
+  token: 'tokenCliente',
+  antes: [novaChave('chaveTemp')],
+  cabecalhos: { 'Idempotency-Key': '{{chaveTemp}}' },
+  corpo,
+  testes,
+});
+
 const auth = {
   name: 'Auth',
   item: [
@@ -74,6 +83,13 @@ const auth = {
       corpo: { nome: 'Cliente Postman', email: '{{emailCliente}}', senha: '{{senhaCliente}}' },
       testes: erro(409, 'EMAIL_JA_CADASTRADO'),
     }),
+    requisicao('Cadastro com e-mail invalido e senha curta (422)', 'POST', '/usuarios', {
+      corpo: { nome: 'Cliente Postman', email: 'sem-arroba', senha: '123' },
+      testes: js(
+        erro(422, 'VALIDACAO'),
+        "pm.test('aponta os dois campos', () => pm.expect(pm.response.json().details.map((d) => d.field)).to.include.members(['email', 'senha']));",
+      ),
+    }),
     requisicao('Login do cliente', 'POST', '/auth/login', {
       corpo: { email: '{{emailCliente}}', senha: '{{senhaCliente}}' },
       testes: js(status(200), salvar('tokenCliente', 'pm.response.json().accessToken')),
@@ -83,6 +99,7 @@ const auth = {
     login('Login gerente shopping', 'emailGerenteShopping', 'tokenGerenteShopping'),
     login('Login atendente centro', 'emailAtendenteCentro', 'tokenAtendenteCentro'),
     login('Login cozinha centro', 'emailCozinhaCentro', 'tokenCozinhaCentro'),
+    login('Login de outro cliente (seed)', 'emailOutroCliente', 'tokenOutroCliente'),
     requisicao('Login com senha errada (401)', 'POST', '/auth/login', {
       corpo: { email: '{{emailCliente}}', senha: 'SenhaErrada@1' },
       testes: js(erro(401, 'NAO_AUTENTICADO'), "pm.test('mensagem generica', () => pm.expect(pm.response.json().message).to.eql('Credenciais invalidas.'));"),
@@ -115,6 +132,7 @@ const unidades = {
         "pm.test('item indisponivel nao aparece', () => pm.expect(item('Combo Classico')).to.be.undefined);",
         salvar('produtoXBurgerId', "item('X-Burger').produtoId"),
         salvar('produtoRefriId', "item('Refrigerante Lata').produtoId"),
+        salvar('produtoBatataId', "item('Batata Frita').produtoId"),
         salvar('precoXBurgerCentro', "item('X-Burger').precoCentavos"),
         salvar('precoRefriCentro', "item('Refrigerante Lata').precoCentavos"),
       ),
@@ -233,6 +251,16 @@ const pedidos = {
       corpo: pedidoCentro([{ produtoId: '#produtoXBurgerId', quantidade: 1, precoCentavos: 1 }]),
       testes: erro(422, 'VALIDACAO'),
     }),
+    pedidoInvalido('Pedido sem canalPedido (422)', { unidadeId: '#unidadeCentroId', formaPagamento: 'MOCK', itens: [{ produtoId: '#produtoXBurgerId', quantidade: 1 }] },
+      js(erro(422, 'VALIDACAO'), "pm.test('campo canalPedido obrigatorio', () => pm.expect(pm.response.json().details).to.deep.include({ field: 'canalPedido', issue: 'Campo obrigatorio.' }));")),
+    pedidoInvalido('Canal fora da lista (422)', pedidoCentro([{ produtoId: '#produtoXBurgerId', quantidade: 1 }], { canalPedido: 'DRIVE_THRU' }),
+      js(erro(422, 'VALIDACAO'), "pm.test('lista os canais aceitos', () => pm.expect(pm.response.json().details[0].issue).to.include('APP, TOTEM, BALCAO, PICKUP, WEB'));")),
+    pedidoInvalido('Quantidade fracionada (422)', pedidoCentro([{ produtoId: '#produtoXBurgerId', quantidade: 1.5 }]),
+      js(erro(422, 'VALIDACAO'), "pm.test('campo da quantidade', () => pm.expect(pm.response.json().details[0].field).to.eql('itens[0].quantidade'));")),
+    pedidoInvalido('Produto inexistente (404)', pedidoCentro([{ produtoId: 999999, quantidade: 1 }]), erro(404, 'PRODUTO_NAO_ENCONTRADO')),
+    pedidoInvalido('Unidade inexistente (404)', { ...pedidoCentro([{ produtoId: '#produtoXBurgerId', quantidade: 1 }]), unidadeId: 999999 }, erro(404, 'UNIDADE_NAO_ENCONTRADA')),
+    pedidoInvalido('Estoque insuficiente (409)', pedidoCentro([{ produtoId: '#produtoBatataId', quantidade: 99 }]),
+      js(erro(409, 'ESTOQUE_INSUFICIENTE'), "pm.test('aponta o item sem saldo', () => pm.expect(pm.response.json().details[0].field).to.eql('itens[0].quantidade'));")),
     requisicao('Detalhar pedido', 'GET', '/pedidos/{{pedidoId}}', {
       token: 'tokenCliente',
       testes: js(status(200), "pm.test('itens com preco historico', () => pm.expect(pm.response.json().itens[0]).to.have.property('precoUnitarioCentavos'));"),
@@ -247,6 +275,16 @@ const pedidos = {
       cabecalhos: { 'Idempotency-Key': '{{chaveTemp}}' },
       corpo: pedidoCentro([{ produtoId: '#produtoRefriId', quantidade: 2 }], { canalPedido: 'BALCAO' }),
       testes: js(status(201), "pm.test('pedido anonimo', () => pm.expect(pm.response.json().clienteId).to.eql(null));", salvar('pedidoBalcaoId', 'pm.response.json().id')),
+    }),
+    requisicao('Atendente filtra pedidos por canal BALCAO', 'GET', '/pedidos?canalPedido=BALCAO&unidadeId={{unidadeCentroId}}&limit=20', {
+      token: 'tokenAtendenteCentro',
+      testes: js(
+        status(200),
+        'const dados = pm.response.json().dados;',
+        "pm.test('so BALCAO da unidade', () => pm.expect(dados.every((p) => p.canalPedido === 'BALCAO' && p.unidadeId === Number(pm.collectionVariables.get('unidadeCentroId')))).to.be.true);",
+        "pm.test('inclui o pedido de balcao criado', () => pm.expect(dados.map((p) => p.id)).to.include(Number(pm.collectionVariables.get('pedidoBalcaoId'))));",
+        "pm.test('nao inclui o pedido do APP', () => pm.expect(dados.map((p) => p.id)).to.not.include(Number(pm.collectionVariables.get('pedidoId'))));",
+      ),
     }),
     requisicao('Cancelar pedido de balcao', 'POST', '/pedidos/{{pedidoBalcaoId}}/cancelamentos', {
       token: 'tokenAtendenteCentro', corpo: { motivo: 'Cliente desistiu' },
@@ -427,6 +465,7 @@ const errosAuditoria = {
       testes: js(erro(422, 'IDEMPOTENCY_KEY_INVALIDA'), "pm.test('campo do cabecalho', () => pm.expect(pm.response.json().details[0].field).to.eql('Idempotency-Key'));"),
     }),
     requisicao('Limit acima de 100 (422)', 'GET', '/pedidos?limit=101', { token: 'tokenCliente', testes: erro(422, 'VALIDACAO') }),
+    requisicao('Outro cliente nao ve o pedido (403)', 'GET', '/pedidos/{{pedidoId}}', { token: 'tokenOutroCliente', testes: erro(403, 'ACESSO_NEGADO') }),
     requisicao('Gerente de outra unidade nao ve o pedido (403)', 'GET', '/pedidos/{{pedidoId}}', { token: 'tokenGerenteShopping', testes: erro(403, 'ACESSO_NEGADO') }),
     requisicao('Cliente nao acessa auditoria (403)', 'GET', '/auditorias', { token: 'tokenCliente', testes: erro(403, 'ACESSO_NEGADO') }),
     requisicao('Muitas tentativas de login (429)', 'POST', '/auth/login', {
@@ -486,6 +525,7 @@ const ambiente = {
     ['emailGerenteShopping', 'gerente.shopping@demo.local'],
     ['emailAtendenteCentro', 'atendente.centro@demo.local'],
     ['emailCozinhaCentro', 'cozinha.centro@demo.local'],
+    ['emailOutroCliente', 'cliente.bruno@demo.local'],
     ['loginMaxTentativas', '5'],
   ].map(([key, value]) => ({ key, value, type: 'default', enabled: true })),
 };

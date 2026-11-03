@@ -1,25 +1,28 @@
 # Evidência: execução da coleção Postman com newman
 
-Gerado por `npm run postman:executar -- --evidencia` em 2026-10-28T16:50:23.388Z, com a API num banco SQLite temporário com seed.
+Gerado por `npm run postman:executar -- --evidencia` em 2026-10-28T17:40:43.434Z, com a API num banco SQLite temporário com seed.
 
 | Item | Total | Falhas |
 |---|---:|---:|
-| Requisições | 82 | 0 |
-| Asserções | 312 | 0 |
+| Requisições da coleção | 87 | - |
+| Requisições HTTP enviadas (inclui 5 de pre-request) | 92 | 0 |
+| Asserções | 359 | 0 |
 
-Duração total: 12397 ms.
+Duração total: 13372 ms.
 
 | Pasta / requisição | Método | Status | Asserções |
 |---|---|---:|---|
 | Auth / Health | GET | 200 | 4/4 ok |
 | Auth / Cadastrar cliente | POST | 201 | 4/4 ok |
 | Auth / Cadastro com e-mail repetido (409) | POST | 409 | 4/4 ok |
+| Auth / Cadastro com e-mail invalido e senha curta (422) | POST | 422 | 5/5 ok |
 | Auth / Login do cliente | POST | 200 | 3/3 ok |
 | Auth / Login admin | POST | 200 | 4/4 ok |
 | Auth / Login gerente centro | POST | 200 | 4/4 ok |
 | Auth / Login gerente shopping | POST | 200 | 4/4 ok |
 | Auth / Login atendente centro | POST | 200 | 4/4 ok |
 | Auth / Login cozinha centro | POST | 200 | 4/4 ok |
+| Auth / Login de outro cliente (seed) | POST | 200 | 4/4 ok |
 | Auth / Login com senha errada (401) | POST | 401 | 5/5 ok |
 | Auth / Meu perfil | GET | 200 | 4/4 ok |
 | Units/Menu / Listar unidades (publico) | GET | 200 | 4/4 ok |
@@ -42,9 +45,16 @@ Duração total: 12397 ms.
 | Orders / Repetir criacao com a mesma Idempotency-Key | POST | 201 | 5/5 ok |
 | Orders / Mesma chave com outro corpo (409) | POST | 409 | 4/4 ok |
 | Orders / Cliente tenta mandar o preco (422) | POST | 422 | 4/4 ok |
+| Orders / Pedido sem canalPedido (422) | POST | 422 | 5/5 ok |
+| Orders / Canal fora da lista (422) | POST | 422 | 5/5 ok |
+| Orders / Quantidade fracionada (422) | POST | 422 | 5/5 ok |
+| Orders / Produto inexistente (404) | POST | 404 | 4/4 ok |
+| Orders / Unidade inexistente (404) | POST | 404 | 4/4 ok |
+| Orders / Estoque insuficiente (409) | POST | 409 | 5/5 ok |
 | Orders / Detalhar pedido | GET | 200 | 4/4 ok |
 | Orders / Listar pedidos com filtros | GET | 200 | 4/4 ok |
 | Orders / Atendente cria pedido de balcao | POST | 201 | 4/4 ok |
+| Orders / Atendente filtra pedidos por canal BALCAO | GET | 200 | 6/6 ok |
 | Orders / Cancelar pedido de balcao | POST | 200 | 4/4 ok |
 | Orders / Cancelar de novo (409) | POST | 409 | 4/4 ok |
 | Payment / Pagar pedido (aprovado) | POST | 201 | 5/5 ok |
@@ -82,13 +92,9 @@ Duração total: 12397 ms.
 | Errors/Audit / Pedido inexistente (404) | GET | 404 | 4/4 ok |
 | Errors/Audit / Pedido sem Idempotency-Key (422) | POST | 422 | 5/5 ok |
 | Errors/Audit / Limit acima de 100 (422) | GET | 422 | 4/4 ok |
+| Errors/Audit / Outro cliente nao ve o pedido (403) | GET | 403 | 4/4 ok |
 | Errors/Audit / Gerente de outra unidade nao ve o pedido (403) | GET | 403 | 4/4 ok |
 | Errors/Audit / Cliente nao acessa auditoria (403) | GET | 403 | 4/4 ok |
-| Errors/Audit / Muitas tentativas de login (429) | POST | 429 | 5/5 ok |
-| Errors/Audit / Muitas tentativas de login (429) | POST | 429 | 5/5 ok |
-| Errors/Audit / Muitas tentativas de login (429) | POST | 429 | 5/5 ok |
-| Errors/Audit / Muitas tentativas de login (429) | POST | 429 | 5/5 ok |
-| Errors/Audit / Muitas tentativas de login (429) | POST | 429 | 5/5 ok |
 | Errors/Audit / Muitas tentativas de login (429) | POST | 429 | 5/5 ok |
 | Errors/Audit / Auditoria do pagamento aprovado | GET | 200 | 4/4 ok |
 | Errors/Audit / Auditoria do pedido (gerente da unidade) | GET | 200 | 5/5 ok |

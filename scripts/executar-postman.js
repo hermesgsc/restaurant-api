@@ -60,6 +60,11 @@ function rodarNewman(url) {
 
 function escreverEvidencia(resumo) {
   const { stats, executions, failures, timings } = resumo.run;
+  // pm.sendRequest do pre-request tambem vira execucao do mesmo item;
+  // fica so a ultima de cada item, que e a requisicao de verdade
+  const porItem = new Map();
+  for (const ex of executions) porItem.set(ex.item.id, ex);
+  const auxiliares = executions.length - porItem.size;
   const linhas = [
     '# Evidência: execução da coleção Postman com newman',
     '',
@@ -67,7 +72,8 @@ function escreverEvidencia(resumo) {
     '',
     '| Item | Total | Falhas |',
     '|---|---:|---:|',
-    `| Requisições | ${stats.requests.total} | ${stats.requests.failed} |`,
+    `| Requisições da coleção | ${porItem.size} | - |`,
+    `| Requisições HTTP enviadas (inclui ${auxiliares} de pre-request) | ${stats.requests.total} | ${stats.requests.failed} |`,
     `| Asserções | ${stats.assertions.total} | ${stats.assertions.failed} |`,
     '',
     `Duração total: ${Math.round(timings.completed - timings.started)} ms.`,
@@ -75,7 +81,7 @@ function escreverEvidencia(resumo) {
     '| Pasta / requisição | Método | Status | Asserções |',
     '|---|---|---:|---|',
   ];
-  for (const ex of executions) {
+  for (const ex of porItem.values()) {
     const pasta = ex.item.parent()?.name ?? '';
     const asserts = ex.assertions ?? [];
     const falhas = asserts.filter((a) => a.error).length;
