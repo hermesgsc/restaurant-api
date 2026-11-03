@@ -1,4 +1,4 @@
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, paginar, transacao, traduzirUnico } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel, temEscopoUnidade } from '../domain/papeis.js';
 
@@ -6,11 +6,8 @@ function paraUnidade(l) {
   return { id: l.id, nome: l.nome, cidade: l.cidade, ativa: l.ativa === 1, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em };
 }
 
-function conflitoNome(erro, campo) {
-  if (String(erro.message).includes('UNIQUE constraint failed')) {
-    return erros.conflito('NOME_DUPLICADO', 'Ja existe um registro com este nome.', [{ field: campo, issue: 'Nome ja utilizado.' }]);
-  }
-  return erro;
+function conflitoNome(erro) {
+  return traduzirUnico(erro, 'unidades.nome', () => erros.conflito('NOME_DUPLICADO', 'Ja existe um registro com este nome.', [{ field: 'nome', issue: 'Nome ja utilizado.' }]));
 }
 
 export function criarServicoUnidades({ db, auditoria }) {
@@ -33,9 +30,8 @@ export function criarServicoUnidades({ db, auditoria }) {
       params.push(ativa ? 1 : 0);
     }
     const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
-    const total = db.prepare(`SELECT COUNT(*) AS total FROM unidades ${where}`).get(...params).total;
-    const linhas = db.prepare(`SELECT * FROM unidades ${where} ORDER BY id LIMIT ? OFFSET ?`).all(...params, limite, (pagina - 1) * limite);
-    return { dados: linhas.map(paraUnidade), paginacao: { pagina, limite, total } };
+    const { linhas, paginacao } = paginar(db, { de: `FROM unidades ${where}`, params, ordem: 'id', pagina, limite });
+    return { dados: linhas.map(paraUnidade), paginacao };
   }
 
   function criar(ator, { nome, cidade }, requestId) {
@@ -49,7 +45,7 @@ export function criarServicoUnidades({ db, auditoria }) {
         return paraUnidade(buscar.get(id));
       });
     } catch (erro) {
-      throw conflitoNome(erro, 'nome');
+      throw conflitoNome(erro);
     }
   }
 
@@ -70,7 +66,7 @@ export function criarServicoUnidades({ db, auditoria }) {
         return paraUnidade(buscar.get(id));
       });
     } catch (erro) {
-      throw conflitoNome(erro, 'nome');
+      throw conflitoNome(erro);
     }
   }
 

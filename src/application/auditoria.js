@@ -1,4 +1,4 @@
-import { agora } from '../infrastructure/banco.js';
+import { agora, paginar, placeholders } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 
@@ -31,7 +31,7 @@ export function criarAuditoria(db) {
     const params = [];
     if (ator.papel === Papel.GERENTE) {
       if (filtros.unidadeId !== undefined && !ator.unidadeIds.includes(filtros.unidadeId)) throw erros.proibido();
-      condicoes.push(`unidade_id IN (${ator.unidadeIds.map(() => '?').join(',') || 'NULL'})`);
+      condicoes.push(`unidade_id IN (${placeholders(ator.unidadeIds)})`);
       params.push(...ator.unidadeIds);
     }
     for (const [campo, coluna] of [['unidadeId', 'unidade_id'], ['acao', 'acao'], ['recursoTipo', 'recurso_tipo'], ['recursoId', 'recurso_id'], ['requestId', 'request_id']]) {
@@ -41,9 +41,7 @@ export function criarAuditoria(db) {
       }
     }
     const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
-    const total = db.prepare(`SELECT COUNT(*) AS total FROM auditorias ${where}`).get(...params).total;
-    const linhas = db.prepare(`SELECT * FROM auditorias ${where} ORDER BY id DESC LIMIT ? OFFSET ?`)
-      .all(...params, limite, (pagina - 1) * limite);
+    const { linhas, paginacao } = paginar(db, { de: `FROM auditorias ${where}`, params, ordem: 'id DESC', pagina, limite });
     return {
       dados: linhas.map((l) => ({
         id: l.id,
@@ -58,7 +56,7 @@ export function criarAuditoria(db) {
         detalhes: l.detalhes ? JSON.parse(l.detalhes) : null,
         criadoEm: l.criado_em,
       })),
-      paginacao: { pagina, limite, total },
+      paginacao,
     };
   }
 

@@ -53,6 +53,23 @@ export function transacao(db, fn) {
   }
 }
 
+// `?` pra cada item de um IN (...). lista vazia vira NULL, que nao casa com nada
+export function placeholders(lista) {
+  return lista.map(() => '?').join(',') || 'NULL';
+}
+
+// listagem paginada: `de` e o trecho FROM ... WHERE ... e `params` os valores dele
+export function paginar(db, { colunas = '*', de, params = [], ordem, pagina, limite }) {
+  const total = db.prepare(`SELECT COUNT(*) AS total ${de}`).get(...params).total;
+  const linhas = db.prepare(`SELECT ${colunas} ${de} ORDER BY ${ordem} LIMIT ? OFFSET ?`).all(...params, limite, (pagina - 1) * limite);
+  return { linhas, paginacao: { pagina, limite, total } };
+}
+
+// troca a violacao de UNIQUE de `tabela.coluna` pelo erro de negocio; qualquer outro erro passa igual
+export function traduzirUnico(erro, coluna, criarErro) {
+  return String(erro?.message).includes(`UNIQUE constraint failed: ${coluna}`) ? criarErro() : erro;
+}
+
 export function agora() {
   return new Date().toISOString();
 }

@@ -1,4 +1,4 @@
-import { agora } from '../infrastructure/banco.js';
+import { agora, paginar, placeholders } from '../infrastructure/banco.js';
 import { erros, ErroNegocio } from '../domain/erros.js';
 import { ehFuncionario, Papel, temEscopoUnidade } from '../domain/papeis.js';
 import { multiplicar, somar } from '../domain/dinheiro.js';
@@ -204,16 +204,15 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
       params.push(ator.id);
     } else if (ator.papel !== Papel.ADMIN) {
       if (unidadeId !== undefined && !ator.unidadeIds.includes(unidadeId)) throw erros.proibido('Voce nao tem acesso a esta unidade.');
-      condicoes.push(`unidade_id IN (${ator.unidadeIds.map(() => '?').join(',') || 'NULL'})`);
+      condicoes.push(`unidade_id IN (${placeholders(ator.unidadeIds)})`);
       params.push(...ator.unidadeIds);
     }
     if (unidadeId !== undefined) { condicoes.push('unidade_id = ?'); params.push(unidadeId); }
     if (status !== undefined) { condicoes.push('status = ?'); params.push(status); }
     if (canalPedido !== undefined) { condicoes.push('canal_pedido = ?'); params.push(canalPedido); }
     const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
-    const total = db.prepare(`SELECT COUNT(*) AS total FROM pedidos ${where}`).get(...params).total;
-    const linhas = db.prepare(`SELECT * FROM pedidos ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params, limite, (pagina - 1) * limite);
-    return { dados: linhas.map((l) => paraPedido(l)), paginacao: { pagina, limite, total } };
+    const { linhas, paginacao } = paginar(db, { de: `FROM pedidos ${where}`, params, ordem: 'id DESC', pagina, limite });
+    return { dados: linhas.map((l) => paraPedido(l)), paginacao };
   }
 
   return { criar, obter, listar, obterLinha, exigirAcesso, detalhar };

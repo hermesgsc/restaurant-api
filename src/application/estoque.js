@@ -1,4 +1,4 @@
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, paginar, transacao } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel, temEscopoUnidade } from '../domain/papeis.js';
 import { aplicarMovimento, disponivel, TipoMovimento } from '../domain/estoque.js';
@@ -76,11 +76,15 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
     const params = [unidadeId];
     let filtro = '';
     if (produtoId !== undefined) { filtro = ' AND e.produto_id = ?'; params.push(produtoId); }
-    const sql = `FROM estoques e JOIN produtos p ON p.id = e.produto_id WHERE e.unidade_id = ?${filtro}`;
-    const total = db.prepare(`SELECT COUNT(*) AS total ${sql}`).get(...params).total;
-    const linhas = db.prepare(`SELECT e.*, p.nome AS produto_nome ${sql} ORDER BY p.nome LIMIT ? OFFSET ?`)
-      .all(...params, limite, (pagina - 1) * limite);
-    return { dados: linhas.map(paraSaldo), paginacao: { pagina, limite, total } };
+    const { linhas, paginacao } = paginar(db, {
+      colunas: 'e.*, p.nome AS produto_nome',
+      de: `FROM estoques e JOIN produtos p ON p.id = e.produto_id WHERE e.unidade_id = ?${filtro}`,
+      params,
+      ordem: 'p.nome',
+      pagina,
+      limite,
+    });
+    return { dados: linhas.map(paraSaldo), paginacao };
   }
 
   // entrada e ajuste manual (inventario, perda, quebra). reserva, consumo e
@@ -116,10 +120,8 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
     if (produtoId !== undefined) { condicoes.push('produto_id = ?'); params.push(produtoId); }
     if (tipo !== undefined) { condicoes.push('tipo = ?'); params.push(tipo); }
     const where = `WHERE ${condicoes.join(' AND ')}`;
-    const total = db.prepare(`SELECT COUNT(*) AS total FROM estoque_movimentacoes ${where}`).get(...params).total;
-    const linhas = db.prepare(`SELECT * FROM estoque_movimentacoes ${where} ORDER BY id DESC LIMIT ? OFFSET ?`)
-      .all(...params, limite, (pagina - 1) * limite);
-    return { dados: linhas.map(paraMovimento), paginacao: { pagina, limite, total } };
+    const { linhas, paginacao } = paginar(db, { de: `FROM estoque_movimentacoes ${where}`, params, ordem: 'id DESC', pagina, limite });
+    return { dados: linhas.map(paraMovimento), paginacao };
   }
 
   return { movimentar, listarSaldos, registrarMovimentacao, listarMovimentacoes };

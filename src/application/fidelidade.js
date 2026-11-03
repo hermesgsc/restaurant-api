@@ -1,4 +1,4 @@
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, paginar, transacao } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 import { descontoDoResgate, pontosGanhos, REGRA_FIDELIDADE, StatusResgate, TipoLancamento, valorDosPontos } from '../domain/fidelidade.js';
@@ -110,10 +110,10 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
 
   function historico(ator, { pagina, limite }) {
     exigirCliente(ator);
-    const total = db.prepare('SELECT COUNT(*) AS total FROM fidelidade_lancamentos WHERE usuario_id = ?').get(ator.id).total;
-    const linhas = db.prepare('SELECT * FROM fidelidade_lancamentos WHERE usuario_id = ? ORDER BY id DESC LIMIT ? OFFSET ?')
-      .all(ator.id, limite, (pagina - 1) * limite);
-    return { dados: linhas.map(paraLancamento), paginacao: { pagina, limite, total } };
+    const { linhas, paginacao } = paginar(db, {
+      de: 'FROM fidelidade_lancamentos WHERE usuario_id = ?', params: [ator.id], ordem: 'id DESC', pagina, limite,
+    });
+    return { dados: linhas.map(paraLancamento), paginacao };
   }
 
   // chamado dentro da transacao de criacao do pedido: debita os pontos na hora,

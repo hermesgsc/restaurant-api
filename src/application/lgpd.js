@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, placeholders, transacao } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 import { StatusPedido } from '../domain/pedido.js';
@@ -12,7 +12,7 @@ const STATUS_EM_ANDAMENTO = [StatusPedido.AGUARDANDO_PAGAMENTO, StatusPedido.EM_
 // porque pedidos e auditoria apontam pra ela pelo id.
 export function criarServicoLgpd({ db, auditoria, fidelidade }) {
   const buscarUsuario = db.prepare('SELECT * FROM usuarios WHERE id = ?');
-  const pedidosEmAndamento = db.prepare(`SELECT COUNT(*) AS n FROM pedidos WHERE cliente_id = ? AND status IN (${STATUS_EM_ANDAMENTO.map(() => '?').join(',')})`);
+  const pedidosEmAndamento = db.prepare(`SELECT COUNT(*) AS n FROM pedidos WHERE cliente_id = ? AND status IN (${placeholders(STATUS_EM_ANDAMENTO)})`);
 
   function anonimizar(usuarioId, { ator = null, requestId = 'lgpd-comando' } = {}) {
     return transacao(db, () => {

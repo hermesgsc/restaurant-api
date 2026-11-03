@@ -1,4 +1,4 @@
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, transacao, traduzirUnico } from '../infrastructure/banco.js';
 import { erros, ErroNegocio, TipoErro } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 
@@ -44,10 +44,7 @@ export function criarServicoUsuarios({ db, senhas, tokens, limitador, auditoria 
         return novoId;
       });
     } catch (erro) {
-      if (String(erro.message).includes('UNIQUE constraint failed: usuarios.email')) {
-        throw erros.conflito('EMAIL_JA_CADASTRADO', 'Ja existe uma conta com este e-mail.', [{ field: 'email', issue: 'E-mail ja cadastrado.' }]);
-      }
-      throw erro;
+      throw traduzirUnico(erro, 'usuarios.email', () => erros.conflito('EMAIL_JA_CADASTRADO', 'Ja existe uma conta com este e-mail.', [{ field: 'email', issue: 'E-mail ja cadastrado.' }]));
     }
     return paraUsuarioPublico(buscarPorId.get(id));
   }

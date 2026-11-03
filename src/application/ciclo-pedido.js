@@ -1,4 +1,4 @@
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, placeholders, transacao } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { ehFuncionario, Papel } from '../domain/papeis.js';
 import { TipoMovimento } from '../domain/estoque.js';
@@ -17,7 +17,7 @@ export const MotivoCancelamento = Object.freeze({
 // correrem juntos, so o primeiro muda a linha e os outros veem changes = 0.
 export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }) {
   const buscarItens = db.prepare('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? ORDER BY id');
-  const pagamentoVivo = db.prepare(`SELECT id, status FROM pagamentos WHERE pedido_id = ? AND status IN (${STATUS_PAGAMENTO_VIVO.map(() => '?').join(',')})`);
+  const pagamentoVivo = db.prepare(`SELECT id, status FROM pagamentos WHERE pedido_id = ? AND status IN (${placeholders(STATUS_PAGAMENTO_VIVO)})`);
 
   function movimentarItens(pedido, tipo, usuarioId) {
     for (const item of buscarItens.all(pedido.id)) {

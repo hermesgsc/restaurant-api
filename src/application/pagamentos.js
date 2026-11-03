@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, placeholders, transacao } from '../infrastructure/banco.js';
 import { chamarComTimeout, TimeoutGateway } from '../infrastructure/pagamento/gateway.js';
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
@@ -45,7 +45,7 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
   const buscarTentativas = db.prepare('SELECT * FROM pagamento_tentativas WHERE pagamento_id = ? ORDER BY id');
   const buscarPorIdempotencia = db.prepare('SELECT id, status FROM pagamentos WHERE idempotencia_id = ?');
   const buscarDoPedido = db.prepare('SELECT * FROM pagamentos WHERE pedido_id = ? ORDER BY id');
-  const pagamentoVivo = db.prepare(`SELECT * FROM pagamentos WHERE pedido_id = ? AND status IN (${STATUS_PAGAMENTO_VIVO.map(() => '?').join(',')})`);
+  const pagamentoVivo = db.prepare(`SELECT * FROM pagamentos WHERE pedido_id = ? AND status IN (${placeholders(STATUS_PAGAMENTO_VIVO)})`);
   const inserirTentativa = db.prepare(`INSERT INTO pagamento_tentativas (pagamento_id, operacao, payload_requisicao, iniciado_em)
     VALUES (?, ?, ?, ?)`);
   const fecharTentativa = db.prepare('UPDATE pagamento_tentativas SET resultado = ?, payload_resposta = ?, finalizado_em = ? WHERE id = ?');

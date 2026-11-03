@@ -1,4 +1,4 @@
-import { agora, transacao } from '../infrastructure/banco.js';
+import { agora, paginar, transacao, traduzirUnico } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 
@@ -15,10 +15,7 @@ function paraProduto(l) {
 }
 
 function traduzirConflito(erro) {
-  if (String(erro.message).includes('UNIQUE constraint failed: produtos.nome')) {
-    return erros.conflito('NOME_DUPLICADO', 'Ja existe um produto com este nome.', [{ field: 'nome', issue: 'Nome ja utilizado.' }]);
-  }
-  return erro;
+  return traduzirUnico(erro, 'produtos.nome', () => erros.conflito('NOME_DUPLICADO', 'Ja existe um produto com este nome.', [{ field: 'nome', issue: 'Nome ja utilizado.' }]));
 }
 
 // o catalogo e da rede toda, por isso so admin mexe. produto nunca e apagado,
@@ -40,9 +37,8 @@ export function criarServicoProdutos({ db, auditoria }) {
     else if (ativo !== undefined) { condicoes.push('ativo = ?'); params.push(ativo ? 1 : 0); }
     if (categoria) { condicoes.push('categoria = ?'); params.push(categoria); }
     const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
-    const total = db.prepare(`SELECT COUNT(*) AS total FROM produtos ${where}`).get(...params).total;
-    const linhas = db.prepare(`SELECT * FROM produtos ${where} ORDER BY id LIMIT ? OFFSET ?`).all(...params, limite, (pagina - 1) * limite);
-    return { dados: linhas.map(paraProduto), paginacao: { pagina, limite, total } };
+    const { linhas, paginacao } = paginar(db, { de: `FROM produtos ${where}`, params, ordem: 'id', pagina, limite });
+    return { dados: linhas.map(paraProduto), paginacao };
   }
 
   function criar(ator, { nome, descricao = null, categoria }, requestId) {
