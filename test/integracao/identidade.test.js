@@ -81,6 +81,13 @@ describe('cadastro e login', () => {
     assert.equal(r.status, 429);
     assert.ok(Number(r.headers.get('retry-after')) > 0);
   });
+
+  test('limitador de login segura uma rajada de tentativas em paralelo', async () => {
+    const tentativas = Array.from({ length: 10 }, () => amb.chamar('POST', '/auth/login', { corpo: { email: 'rajada@demo.local', senha: 'errada' } }));
+    const status = (await Promise.all(tentativas)).map((r) => r.status);
+    assert.equal(status.filter((s) => s === 401).length, 3);
+    assert.equal(status.filter((s) => s === 429).length, 7);
+  });
 });
 
 describe('token e erros padrao', () => {

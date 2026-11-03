@@ -54,7 +54,7 @@ export function criarServicoUsuarios({ db, senhas, tokens, limitador, auditoria 
 
   async function login({ email, senha }, { ip, requestId }) {
     const chave = `${ip}|${email.toLowerCase()}`;
-    const espera = limitador.segundosBloqueado(chave);
+    const espera = limitador.tentar(chave);
     if (espera > 0) {
       const erro = new ErroNegocio(TipoErro.LIMITE_EXCEDIDO, 'MUITAS_TENTATIVAS', 'Muitas tentativas de login. Tente novamente mais tarde.');
       erro.segundosEspera = espera;
@@ -63,7 +63,6 @@ export function criarServicoUsuarios({ db, senhas, tokens, limitador, auditoria 
     const linha = buscarPorEmail.get(email);
     const confere = await senhas.conferir(senha, linha?.senha_hash);
     if (!linha || !confere || linha.ativo !== 1) {
-      limitador.registrarFalha(chave);
       auditoria.registrar({ ator: null, acao: 'LOGIN_FALHOU', recursoTipo: 'SESSAO', resultado: 'NEGADO', requestId });
       // mensagem generica de proposito, nao diz se o e-mail existe
       throw erros.naoAutenticado('Credenciais invalidas.');
