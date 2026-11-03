@@ -40,6 +40,10 @@ export function tratadorErros(logger) {
     if (erro?.type === 'encoding.unsupported' || erro?.type === 'charset.unsupported') {
       return res.status(415).json(envelopeErro(req, 'CODIFICACAO_NAO_SUPORTADA', 'Codificacao do corpo nao suportada.'));
     }
+    // o router do express 5 lanca URIError quando um parametro da rota tem % malformado (ex. /pedidos/%ZZ)
+    if (erro instanceof URIError) {
+      return res.status(400).json(envelopeErro(req, 'PARAMETRO_MALFORMADO', 'A URL tem um parametro com codificacao invalida.'));
+    }
     logger.error({ requestId: req.requestId, erro: erro?.message, stack: erro?.stack });
     return res.status(500).json(envelopeErro(req, 'ERRO_INTERNO', 'Erro inesperado. Informe o requestId ao suporte.'));
   };

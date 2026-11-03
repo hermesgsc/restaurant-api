@@ -97,6 +97,13 @@ describe('token e erros padrao', () => {
     conferirEnvelope(r.corpo, 'NAO_AUTENTICADO', '/usuarios/me');
   });
 
+  test('parametro de rota com % malformado retorna 400 e nao 500', async () => {
+    const token = await amb.login(EMAILS.ana);
+    const r = await amb.chamar('GET', '/pedidos/%ZZ', { token });
+    assert.equal(r.status, 400);
+    conferirEnvelope(r.corpo, 'PARAMETRO_MALFORMADO', '/pedidos/%ZZ');
+  });
+
   test('token adulterado retorna 401', async () => {
     const token = await amb.login(EMAILS.ana);
     const [h, p, s] = token.split('.');
