@@ -1,7 +1,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { criarAmbiente, EMAILS } from '../apoio/ambiente.js';
+import { criarAmbiente, EMAILS, novaChave } from '../apoio/ambiente.js';
 
 let amb;
 let centro;
@@ -13,7 +13,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-const chave = () => `teste-${crypto.randomUUID()}`;
 
 let contador = 0;
 // cada teste usa um cliente novo pra o saldo de um nao interferir no outro
@@ -32,14 +31,14 @@ async function consentir(token) {
   return r.corpo;
 }
 
-async function criarPedido(token, { itens = [{ produtoId: p['X-Burger'], quantidade: 2 }], pontosResgatar, k = chave() } = {}) {
+async function criarPedido(token, { itens = [{ produtoId: p['X-Burger'], quantidade: 2 }], pontosResgatar, k = novaChave() } = {}) {
   const corpo = { unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK', itens };
   if (pontosResgatar !== undefined) corpo.pontosResgatar = pontosResgatar;
   return amb.chamar('POST', '/pedidos', { token, corpo, cabecalhos: { 'idempotency-key': k } });
 }
 
 async function pagar(token, pedidoId, cenario = 'APROVAR') {
-  return amb.chamar('POST', `/pedidos/${pedidoId}/pagamentos`, { token, cabecalhos: { 'idempotency-key': chave(), 'x-mock-cenario': cenario } });
+  return amb.chamar('POST', `/pedidos/${pedidoId}/pagamentos`, { token, cabecalhos: { 'idempotency-key': novaChave(), 'x-mock-cenario': cenario } });
 }
 
 async function entregar(pedidoId) {
@@ -163,7 +162,7 @@ describe('credito na entrega', () => {
   test('pedido anonimo de balcao nao gera pontos', async () => {
     const token = await amb.login(EMAILS.atendenteCentro);
     const r = await amb.chamar('POST', '/pedidos', {
-      token, cabecalhos: { 'idempotency-key': chave() },
+      token, cabecalhos: { 'idempotency-key': novaChave() },
       corpo: { unidadeId: centro, canalPedido: 'BALCAO', formaPagamento: 'MOCK', itens: [{ produtoId: p['X-Burger'], quantidade: 1 }] },
     });
     await pagar(token, r.corpo.id);
@@ -271,7 +270,7 @@ describe('resgate de pontos', () => {
     darPontos(c.id, 50);
     const token = await amb.login(EMAILS.atendenteCentro);
     const r = await amb.chamar('POST', '/pedidos', {
-      token, cabecalhos: { 'idempotency-key': chave() },
+      token, cabecalhos: { 'idempotency-key': novaChave() },
       corpo: { unidadeId: centro, canalPedido: 'BALCAO', formaPagamento: 'MOCK', clienteId: c.id, pontosResgatar: 10, itens: [{ produtoId: p['X-Burger'], quantidade: 1 }] },
     });
     assert.equal(r.status, 403);

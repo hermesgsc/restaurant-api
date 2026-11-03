@@ -13,11 +13,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-function saldo(unidadeId, produtoId) {
-  return amb.db.prepare('SELECT quantidade_total AS total, quantidade_reservada AS reservada FROM estoques WHERE unidade_id = ? AND produto_id = ?')
-    .get(unidadeId, produtoId);
-}
-
 describe('consulta e movimentacao manual', () => {
   test('saldo e independente por unidade', async () => {
     const token = await amb.login(EMAILS.admin);
@@ -53,7 +48,7 @@ describe('consulta e movimentacao manual', () => {
     });
     assert.equal(negativo.status, 409);
     assert.equal(negativo.corpo.error, 'AJUSTE_INVALIDO');
-    assert.equal(saldo(centro, batata).total, 1);
+    assert.equal(amb.saldo(centro, batata).total, 1);
   });
 
   test('tipos do fluxo de pedido nao podem ser lancados a mao', async () => {
@@ -105,7 +100,7 @@ describe('consulta e movimentacao manual', () => {
 describe('concorrencia no ultimo item', () => {
   test('8 conexoes disputando 1 unidade: so uma reserva passa e nada fica negativo', async () => {
     const batata = amb.ids.produtoId['Batata Frita'];
-    assert.deepEqual({ ...saldo(centro, batata) }, { total: 1, reservada: 0 });
+    assert.deepEqual(amb.saldo(centro, batata), { total: 1, reservada: 0 });
     const sinal = new SharedArrayBuffer(4);
     const workers = Array.from({ length: 8 }, () => new Worker(new URL('../apoio/reservar-em-thread.js', import.meta.url), {
       workerData: { arquivo: amb.config.arquivoBanco, unidadeId: centro, produtoId: batata, sinal },
@@ -120,7 +115,7 @@ describe('concorrencia no ultimo item', () => {
     const respostas = await Promise.all(resultados);
     assert.equal(respostas.filter((r) => r.ok).length, 1);
     assert.ok(respostas.filter((r) => !r.ok).every((r) => r.codigo === 'ESTOQUE_INSUFICIENTE'), JSON.stringify(respostas));
-    assert.deepEqual({ ...saldo(centro, batata) }, { total: 1, reservada: 1 });
+    assert.deepEqual(amb.saldo(centro, batata), { total: 1, reservada: 1 });
     const reservas = amb.db.prepare("SELECT COUNT(*) AS n FROM estoque_movimentacoes WHERE unidade_id = ? AND produto_id = ? AND tipo = 'RESERVA'")
       .get(centro, batata).n;
     assert.equal(reservas, 1);

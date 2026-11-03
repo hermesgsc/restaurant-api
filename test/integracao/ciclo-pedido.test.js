@@ -1,7 +1,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { criarAmbiente, EMAILS } from '../apoio/ambiente.js';
+import { criarAmbiente, EMAILS, novaChave } from '../apoio/ambiente.js';
 
 let amb;
 let centro;
@@ -15,16 +15,11 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-const chave = () => `teste-${crypto.randomUUID()}`;
-
-function saldo(unidadeId, produtoId) {
-  return { ...amb.db.prepare('SELECT quantidade_total AS total, quantidade_reservada AS reservada FROM estoques WHERE unidade_id = ? AND produto_id = ?').get(unidadeId, produtoId) };
-}
 
 async function novoPedido({ email = EMAILS.ana, unidadeId = centro, itens = [{ produtoId: p['X-Salada'], quantidade: 1 }] } = {}) {
   const token = await amb.login(email);
   const r = await amb.chamar('POST', '/pedidos', {
-    token, corpo: { unidadeId, canalPedido: 'APP', formaPagamento: 'MOCK', itens }, cabecalhos: { 'idempotency-key': chave() },
+    token, corpo: { unidadeId, canalPedido: 'APP', formaPagamento: 'MOCK', itens }, cabecalhos: { 'idempotency-key': novaChave() },
   });
   assert.equal(r.status, 201);
   return r.corpo;
@@ -33,7 +28,7 @@ async function novoPedido({ email = EMAILS.ana, unidadeId = centro, itens = [{ p
 async function pedidoPago(opcoes) {
   const pedido = await novoPedido(opcoes);
   const token = await amb.login(opcoes?.email ?? EMAILS.ana);
-  const r = await amb.chamar('POST', `/pedidos/${pedido.id}/pagamentos`, { token, cabecalhos: { 'idempotency-key': chave(), 'x-mock-cenario': 'APROVAR' } });
+  const r = await amb.chamar('POST', `/pedidos/${pedido.id}/pagamentos`, { token, cabecalhos: { 'idempotency-key': novaChave(), 'x-mock-cenario': 'APROVAR' } });
   assert.equal(r.status, 201);
   return r.corpo.pedido;
 }
@@ -119,33 +114,33 @@ describe('progressao do pedido', () => {
 
 describe('cancelamento', () => {
   test('cliente cancela antes do pagamento e o estoque volta', async () => {
-    const antes = saldo(centro, p['X-Salada']);
+    const antes = amb.saldo(centro, p['X-Salada']);
     const pedido = await novoPedido();
-    assert.equal(saldo(centro, p['X-Salada']).reservada, antes.reservada + 1);
+    assert.equal(amb.saldo(centro, p['X-Salada']).reservada, antes.reservada + 1);
     const r = await cancelar(EMAILS.ana, pedido.id, { motivo: 'Pedi errado' });
     assert.equal(r.status, 200);
     assert.equal(r.corpo.status, 'CANCELADO');
     assert.equal(r.corpo.reservaEstoque, 'LIBERADA');
     assert.equal(r.corpo.motivoCancelamento, 'SOLICITADO: Pedi errado');
-    assert.deepEqual(saldo(centro, p['X-Salada']), antes);
+    assert.deepEqual(amb.saldo(centro, p['X-Salada']), antes);
   });
 
   test('cancelar de novo retorna 409 e nao devolve estoque duas vezes', async () => {
-    const antes = saldo(centro, p['X-Salada']);
+    const antes = amb.saldo(centro, p['X-Salada']);
     const pedido = await novoPedido();
     await cancelar(EMAILS.ana, pedido.id);
     const r = await cancelar(EMAILS.ana, pedido.id);
     assert.equal(r.status, 409);
     assert.equal(r.corpo.error, 'PEDIDO_JA_CANCELADO');
-    assert.deepEqual(saldo(centro, p['X-Salada']), antes);
+    assert.deepEqual(amb.saldo(centro, p['X-Salada']), antes);
   });
 
   test('cancelamentos simultaneos liberam o estoque uma vez so', async () => {
-    const antes = saldo(centro, p['X-Salada']);
+    const antes = amb.saldo(centro, p['X-Salada']);
     const pedido = await novoPedido();
     const respostas = await Promise.all([1, 2, 3].map(() => cancelar(EMAILS.ana, pedido.id)));
     assert.deepEqual(respostas.map((r) => r.status).sort(), [200, 409, 409]);
-    assert.deepEqual(saldo(centro, p['X-Salada']), antes);
+    assert.deepEqual(amb.saldo(centro, p['X-Salada']), antes);
   });
 
   test('cancelar depois do pagamento retorna 409', async () => {
@@ -177,7 +172,7 @@ describe('cancelamento', () => {
 
 describe('expiracao', () => {
   test('pedido vencido e cancelado como EXPIRADO e devolve a reserva', async () => {
-    const antes = saldo(shopping, p['X-Burger']);
+    const antes = amb.saldo(shopping, p['X-Burger']);
     const pedido = await novoPedido({ unidadeId: shopping, itens: [{ produtoId: p['X-Burger'], quantidade: 3 }] });
     const vigente = await novoPedido({ unidadeId: shopping, itens: [{ produtoId: p['X-Burger'], quantidade: 1 }] });
     amb.db.prepare('UPDATE pedidos SET expira_em = ? WHERE id = ?').run('2000-01-01T00:00:00.000Z', pedido.id);
@@ -187,7 +182,7 @@ describe('expiracao', () => {
     const linha = amb.db.prepare('SELECT status, motivo_cancelamento, reserva_estoque_status FROM pedidos WHERE id = ?').get(pedido.id);
     assert.deepEqual({ ...linha }, { status: 'CANCELADO', motivo_cancelamento: 'EXPIRADO', reserva_estoque_status: 'LIBERADA' });
     assert.equal(amb.db.prepare('SELECT status FROM pedidos WHERE id = ?').get(vigente.id).status, 'AGUARDANDO_PAGAMENTO');
-    assert.deepEqual(saldo(shopping, p['X-Burger']), { total: antes.total, reservada: antes.reservada + 1 });
+    assert.deepEqual(amb.saldo(shopping, p['X-Burger']), { total: antes.total, reservada: antes.reservada + 1 });
 
     // rodar de novo nao faz nada
     assert.equal(amb.servicos.ciclo.expirarVencidos().expirados, 0);

@@ -1,7 +1,6 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
-import { criarAmbiente, EMAILS } from '../apoio/ambiente.js';
+import { criarAmbiente, EMAILS, novaChave } from '../apoio/ambiente.js';
 
 let amb;
 let centro;
@@ -17,14 +16,9 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-const chave = () => `teste-${crypto.randomUUID()}`;
 
-function criarPedido(token, corpo, k = chave()) {
+function criarPedido(token, corpo, k = novaChave()) {
   return amb.chamar('POST', '/pedidos', { token, corpo, cabecalhos: { 'idempotency-key': k } });
-}
-
-function saldo(unidadeId, produtoId) {
-  return { ...amb.db.prepare('SELECT quantidade_total AS total, quantidade_reservada AS reservada FROM estoques WHERE unidade_id = ? AND produto_id = ?').get(unidadeId, produtoId) };
 }
 
 const contarPedidos = () => amb.db.prepare('SELECT COUNT(*) AS n FROM pedidos').get().n;
@@ -32,7 +26,7 @@ const contarPedidos = () => amb.db.prepare('SELECT COUNT(*) AS n FROM pedidos').
 describe('criacao de pedido', () => {
   test('cliente cria pedido com total do servidor, preco historico e reserva', async () => {
     const token = await amb.login(EMAILS.ana);
-    const antes = saldo(centro, p['X-Burger']);
+    const antes = amb.saldo(centro, p['X-Burger']);
     const r = await criarPedido(token, {
       unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK',
       itens: [{ produtoId: p['X-Burger'], quantidade: 2 }, { produtoId: p['Refrigerante Lata'], quantidade: 3 }],
@@ -45,7 +39,7 @@ describe('criacao de pedido', () => {
     assert.equal(r.corpo.reservaEstoque, 'ATIVA');
     assert.equal(r.corpo.clienteId, (await amb.chamar('GET', '/usuarios/me', { token })).corpo.id);
     assert.deepEqual(r.corpo.itens[0], { produtoId: p['X-Burger'], nomeProduto: 'X-Burger', quantidade: 2, precoUnitarioCentavos: 2590, totalCentavos: 5180 });
-    assert.deepEqual(saldo(centro, p['X-Burger']), { total: antes.total, reservada: antes.reservada + 2 });
+    assert.deepEqual(amb.saldo(centro, p['X-Burger']), { total: antes.total, reservada: antes.reservada + 2 });
     const movimentos = amb.db.prepare("SELECT COUNT(*) AS n FROM estoque_movimentacoes WHERE pedido_id = ? AND tipo = 'RESERVA'").get(r.corpo.id).n;
     assert.equal(movimentos, 2);
   });
@@ -75,7 +69,7 @@ describe('criacao de pedido', () => {
   test('canalPedido ausente ou invalido retorna 422 e nada e criado', async () => {
     const token = await amb.login(EMAILS.ana);
     const antes = contarPedidos();
-    const reservadoAntes = saldo(centro, p['X-Burger']).reservada;
+    const reservadoAntes = amb.saldo(centro, p['X-Burger']).reservada;
     const sem = await criarPedido(token, { unidadeId: centro, formaPagamento: 'MOCK', itens: [{ produtoId: p['X-Burger'], quantidade: 1 }] });
     assert.equal(sem.status, 422);
     assert.equal(sem.corpo.error, 'VALIDACAO');
@@ -84,7 +78,7 @@ describe('criacao de pedido', () => {
     assert.equal(invalido.status, 422);
     assert.match(invalido.corpo.details[0].issue, /APP, TOTEM, BALCAO, PICKUP, WEB/);
     assert.equal(contarPedidos(), antes);
-    assert.equal(saldo(centro, p['X-Burger']).reservada, reservadoAntes);
+    assert.equal(amb.saldo(centro, p['X-Burger']).reservada, reservadoAntes);
   });
 
   test('itens vazios e quantidade zero, negativa ou fracionada sao rejeitados', async () => {
@@ -144,7 +138,7 @@ describe('criacao de pedido', () => {
 
   test('estoque insuficiente retorna 409 e desfaz reservas dos outros itens', async () => {
     const token = await amb.login(EMAILS.bruno);
-    const antesXb = saldo(shopping, p['X-Burger']);
+    const antesXb = amb.saldo(shopping, p['X-Burger']);
     const r = await criarPedido(token, {
       unidadeId: shopping, canalPedido: 'TOTEM', formaPagamento: 'MOCK',
       itens: [{ produtoId: p['X-Burger'], quantidade: 2 }, { produtoId: p['Refrigerante Lata'], quantidade: 1 }],
@@ -152,7 +146,7 @@ describe('criacao de pedido', () => {
     assert.equal(r.status, 409);
     assert.equal(r.corpo.error, 'ESTOQUE_INSUFICIENTE');
     assert.deepEqual(r.corpo.details, [{ field: 'itens[1].quantidade', issue: 'Disponivel: 0' }]);
-    assert.deepEqual(saldo(shopping, p['X-Burger']), antesXb);
+    assert.deepEqual(amb.saldo(shopping, p['X-Burger']), antesXb);
   });
 });
 
@@ -253,20 +247,20 @@ describe('idempotencia na criacao', () => {
 
   test('retry com a mesma chave devolve o mesmo pedido sem reservar de novo', async () => {
     const token = await amb.login(EMAILS.bruno);
-    const k = chave();
-    const antes = saldo(shopping, p['Batata Frita']);
+    const k = novaChave();
+    const antes = amb.saldo(shopping, p['Batata Frita']);
     const primeiro = await criarPedido(token, corpo(), k);
     const segundo = await criarPedido(token, corpo(), k);
     assert.equal(primeiro.status, 201);
     assert.equal(segundo.status, 201);
     assert.equal(segundo.headers.get('idempotent-replayed'), 'true');
     assert.deepEqual(segundo.corpo, primeiro.corpo);
-    assert.equal(saldo(shopping, p['Batata Frita']).reservada, antes.reservada + 1);
+    assert.equal(amb.saldo(shopping, p['Batata Frita']).reservada, antes.reservada + 1);
   });
 
   test('mesma chave com outro corpo retorna 409', async () => {
     const token = await amb.login(EMAILS.bruno);
-    const k = chave();
+    const k = novaChave();
     await criarPedido(token, corpo(), k);
     const alterado = await criarPedido(token, { ...corpo(), itens: [{ produtoId: p['Batata Frita'], quantidade: 2 }] }, k);
     assert.equal(alterado.status, 409);
@@ -274,7 +268,7 @@ describe('idempotencia na criacao', () => {
   });
 
   test('a chave e separada por usuario', async () => {
-    const k = chave();
+    const k = novaChave();
     const a = await criarPedido(await amb.login(EMAILS.ana), corpo(), k);
     const b = await criarPedido(await amb.login(EMAILS.bruno), corpo(), k);
     assert.equal(a.status, 201);
@@ -284,7 +278,7 @@ describe('idempotencia na criacao', () => {
 
   test('retries simultaneos com a mesma chave criam um pedido so', async () => {
     const token = await amb.login(EMAILS.ana);
-    const k = chave();
+    const k = novaChave();
     const antes = contarPedidos();
     const respostas = await Promise.all(Array.from({ length: 6 }, () => criarPedido(token, corpo(), k)));
     assert.ok(respostas.every((r) => r.status === 201));
@@ -302,12 +296,12 @@ describe('idempotencia na criacao', () => {
 describe('concorrencia entre compradores', () => {
   test('dois clientes pedindo a ultima unidade: um 201, um 409 e saldo nunca negativo', async () => {
     const batata = p['Batata Frita'];
-    assert.deepEqual(saldo(centro, batata), { total: 1, reservada: 0 });
+    assert.deepEqual(amb.saldo(centro, batata), { total: 1, reservada: 0 });
     const corpo = { unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK', itens: [{ produtoId: batata, quantidade: 1 }] };
     const [ana, bruno] = await Promise.all([amb.login(EMAILS.ana), amb.login(EMAILS.bruno)]);
     const respostas = await Promise.all([criarPedido(ana, corpo), criarPedido(bruno, corpo), criarPedido(ana, corpo), criarPedido(bruno, corpo)]);
     const status = respostas.map((r) => r.status).sort();
     assert.deepEqual(status, [201, 409, 409, 409]);
-    assert.deepEqual(saldo(centro, batata), { total: 1, reservada: 1 });
+    assert.deepEqual(amb.saldo(centro, batata), { total: 1, reservada: 1 });
   });
 });

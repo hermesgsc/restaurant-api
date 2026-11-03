@@ -1,7 +1,6 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
-import { criarAmbiente, EMAILS } from '../apoio/ambiente.js';
+import { criarAmbiente, EMAILS, novaChave } from '../apoio/ambiente.js';
 import { criarGatewayMock } from '../../src/infrastructure/pagamento/gateway-mock.js';
 import { carregarConfig } from '../../src/config.js';
 
@@ -27,22 +26,19 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-const chave = () => `teste-${crypto.randomUUID()}`;
 
-function saldo(produtoId) {
-  return { ...amb.db.prepare('SELECT quantidade_total AS total, quantidade_reservada AS reservada FROM estoques WHERE unidade_id = ? AND produto_id = ?').get(centro, produtoId) };
-}
+const saldo = (produtoId) => amb.saldo(centro, produtoId);
 
 async function novoPedido(email = EMAILS.ana, itens = [{ produtoId: p['X-Burger'], quantidade: 2 }]) {
   const token = await amb.login(email);
   const r = await amb.chamar('POST', '/pedidos', {
-    token, corpo: { unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK', itens }, cabecalhos: { 'idempotency-key': chave() },
+    token, corpo: { unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK', itens }, cabecalhos: { 'idempotency-key': novaChave() },
   });
   assert.equal(r.status, 201);
   return r.corpo;
 }
 
-async function pagar(pedidoId, { email = EMAILS.ana, cenario, k = chave(), corpo } = {}) {
+async function pagar(pedidoId, { email = EMAILS.ana, cenario, k = novaChave(), corpo } = {}) {
   const token = await amb.login(email);
   const cabecalhos = { 'idempotency-key': k };
   if (cenario) cabecalhos['x-mock-cenario'] = cenario;
@@ -100,7 +96,7 @@ describe('pagamento aprovado', () => {
 describe('pagamento duplicado', () => {
   test('retry com a mesma chave devolve o mesmo pagamento sem cobrar de novo', async () => {
     const pedido = await novoPedido();
-    const k = chave();
+    const k = novaChave();
     const primeiro = await pagar(pedido.id, { k });
     const segundo = await pagar(pedido.id, { k });
     assert.equal(primeiro.status, 201);
@@ -114,7 +110,7 @@ describe('pagamento duplicado', () => {
   test('mesma chave com outro pedido retorna 409', async () => {
     const a = await novoPedido();
     const b = await novoPedido();
-    const k = chave();
+    const k = novaChave();
     await pagar(a.id, { k });
     const r = await pagar(b.id, { k });
     assert.equal(r.status, 409);
@@ -145,7 +141,7 @@ describe('pagamento duplicado', () => {
 
   test('retries simultaneos com a mesma chave geram um pagamento so', async () => {
     const pedido = await novoPedido();
-    const k = chave();
+    const k = novaChave();
     const respostas = await Promise.all(Array.from({ length: 4 }, () => pagar(pedido.id, { k })));
     assert.equal(pagamentosDoPedido(pedido.id).length, 1);
     for (const r of respostas) assert.ok([201, 409].includes(r.status));
@@ -203,7 +199,7 @@ describe('timeout do gateway', () => {
 
   test('retry com a mesma chave devolve o estado indefinido sem chamar o gateway de novo', async () => {
     const pedido = await novoPedido();
-    const k = chave();
+    const k = novaChave();
     const primeiro = await pagar(pedido.id, { cenario: 'TIMEOUT', k });
     const segundo = await pagar(pedido.id, { cenario: 'TIMEOUT', k });
     assert.equal(segundo.status, 202);
@@ -216,7 +212,7 @@ describe('timeout do gateway', () => {
 describe('reconciliacao', () => {
   test('consulta aprovada confirma o pedido e conclui a chave', async () => {
     const pedido = await novoPedido();
-    const k = chave();
+    const k = novaChave();
     const r = await pagar(pedido.id, { cenario: 'TIMEOUT', k });
     consulta.resultado = 'APROVADO';
     const resumo = await amb.servicos.pagamentos.reconciliar();
@@ -369,11 +365,11 @@ describe('seletor de cenario fora de dev/teste', () => {
     try {
       const token = await outro.login(EMAILS.ana);
       const pedido = await outro.chamar('POST', '/pedidos', {
-        token, cabecalhos: { 'idempotency-key': chave() },
+        token, cabecalhos: { 'idempotency-key': novaChave() },
         corpo: { unidadeId: outro.ids.unidadeId['Unidade Centro'], canalPedido: 'APP', formaPagamento: 'MOCK', itens: [{ produtoId: outro.ids.produtoId['X-Burger'], quantidade: 1 }] },
       });
       const r = await outro.chamar('POST', `/pedidos/${pedido.corpo.id}/pagamentos`, {
-        token, cabecalhos: { 'idempotency-key': chave(), 'x-mock-cenario': 'APROVAR' },
+        token, cabecalhos: { 'idempotency-key': novaChave(), 'x-mock-cenario': 'APROVAR' },
       });
       assert.equal(r.status, 422);
       assert.equal(r.corpo.error, 'CENARIO_MOCK_NAO_PERMITIDO');

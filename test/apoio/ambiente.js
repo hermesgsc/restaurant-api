@@ -52,14 +52,22 @@ export async function criarAmbiente(extras = {}, { gateway } = {}) {
     return tokens[email];
   }
 
+  // saldo de um produto numa unidade, lido direto do banco
+  function saldo(unidadeId, produtoId) {
+    return { ...db.prepare('SELECT quantidade_total AS total, quantidade_reservada AS reservada FROM estoques WHERE unidade_id = ? AND produto_id = ?').get(unidadeId, produtoId) };
+  }
+
   async function fechar() {
     await new Promise((resolve) => servidor.close(resolve));
     db.close();
     fs.rmSync(pasta, { recursive: true, force: true });
   }
 
-  return { config, db, app, servicos, ids, base, chamar, login, fechar };
+  return { config, db, app, servicos, ids, base, chamar, login, saldo, fechar };
 }
+
+// idempotency-key nova a cada chamada
+export const novaChave = () => `teste-${crypto.randomUUID()}`;
 
 export const EMAILS = {
   admin: 'admin@demo.local',

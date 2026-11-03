@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { criarAmbiente, EMAILS } from '../apoio/ambiente.js';
+import { criarAmbiente, EMAILS, novaChave } from '../apoio/ambiente.js';
 
 let amb;
 let centro;
@@ -15,7 +15,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-const chave = () => `teste-${crypto.randomUUID()}`;
 
 async function clienteComHistorico() {
   const email = `titular-${crypto.randomUUID().slice(0, 8)}@teste.local`;
@@ -23,10 +22,10 @@ async function clienteComHistorico() {
   const token = await amb.login(email, 'Senha@12345');
   await amb.chamar('PUT', '/fidelidade/consentimento', { token });
   const pedido = (await amb.chamar('POST', '/pedidos', {
-    token, cabecalhos: { 'idempotency-key': chave() },
+    token, cabecalhos: { 'idempotency-key': novaChave() },
     corpo: { unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK', itens: [{ produtoId: p['X-Burger'], quantidade: 1 }] },
   })).corpo;
-  await amb.chamar('POST', `/pedidos/${pedido.id}/pagamentos`, { token, cabecalhos: { 'idempotency-key': chave() } });
+  await amb.chamar('POST', `/pedidos/${pedido.id}/pagamentos`, { token, cabecalhos: { 'idempotency-key': novaChave() } });
   await amb.chamar('PATCH', `/pedidos/${pedido.id}/status`, { token: await amb.login(EMAILS.cozinhaCentro), corpo: { status: 'PRONTO' } });
   await amb.chamar('PATCH', `/pedidos/${pedido.id}/status`, { token: await amb.login(EMAILS.atendenteCentro), corpo: { status: 'ENTREGUE' } });
   return { id: cadastro.corpo.id, email, token, pedido };
@@ -105,7 +104,7 @@ describe('anonimizacao', () => {
     const cadastro = await amb.chamar('POST', '/usuarios', { corpo: { nome: 'Joao Andamento', email, senha: 'Senha@12345' } });
     const token = await amb.login(email, 'Senha@12345');
     await amb.chamar('POST', '/pedidos', {
-      token, cabecalhos: { 'idempotency-key': chave() },
+      token, cabecalhos: { 'idempotency-key': novaChave() },
       corpo: { unidadeId: centro, canalPedido: 'APP', formaPagamento: 'MOCK', itens: [{ produtoId: p['X-Burger'], quantidade: 1 }] },
     });
     assert.throws(() => amb.servicos.lgpd.anonimizar(cadastro.corpo.id), { codigo: 'PEDIDOS_EM_ANDAMENTO' });
