@@ -1,4 +1,5 @@
 import express from 'express';
+import swaggerUi from 'swagger-ui-express';
 import { abrirBanco, migrar } from './infrastructure/banco.js';
 import { criarServicoSenhas } from './infrastructure/seguranca/senhas.js';
 import { criarServicoTokens } from './infrastructure/seguranca/tokens.js';
@@ -26,6 +27,7 @@ import { rotasEstoque } from './api/rotas/estoque.js';
 import { rotasPedidos } from './api/rotas/pedidos.js';
 import { rotasPagamentos } from './api/rotas/pagamentos.js';
 import { rotasFidelidade } from './api/rotas/fidelidade.js';
+import { especificacaoOpenApi } from './api/openapi.js';
 
 // monta os servicos da aplicacao em cima de um banco ja aberto.
 // e o mesmo ponto de entrada pro servidor, pros comandos e pros testes
@@ -72,6 +74,9 @@ export function criarApp(config, { db = abrirBanco(config.arquivoBanco), logger 
   app.use(express.json({ limit: '32kb', strict: true }));
 
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+  const especificacao = especificacaoOpenApi();
+  app.get('/openapi.json', (_req, res) => res.json(especificacao));
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(especificacao, { customSiteTitle: 'Rede de Restaurantes API' }));
   app.use(rotasIdentidade(deps));
   app.use(rotasCatalogo(deps));
   app.use(rotasEstoque(deps));

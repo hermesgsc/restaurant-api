@@ -58,7 +58,7 @@ export async function criarAmbiente(extras = {}, { gateway } = {}) {
     fs.rmSync(pasta, { recursive: true, force: true });
   }
 
-  return { config, db, servicos, ids, base, chamar, login, fechar };
+  return { config, db, app, servicos, ids, base, chamar, login, fechar };
 }
 
 export const EMAILS = {

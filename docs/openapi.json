@@ -1,0 +1,4500 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API da rede de restaurantes",
+    "version": "1.0.0",
+    "description": "MVP academico: matriz e unidades, cardapio com preco por unidade, estoque por unidade, pedidos multicanal, pagamento simulado, fidelidade e auditoria.\n\nValores monetarios sao inteiros em centavos. Toda resposta de erro usa o mesmo envelope (schema Erro). Listas aceitam page e limit (maximo 100).\nO pagamento e um gateway simulado (MOCK): nenhum dado de cartao e recebido ou guardado."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sistema"
+    },
+    {
+      "name": "Autenticacao"
+    },
+    {
+      "name": "Unidades e cardapio"
+    },
+    {
+      "name": "Estoque"
+    },
+    {
+      "name": "Pedidos"
+    },
+    {
+      "name": "Pagamento"
+    },
+    {
+      "name": "Fidelidade"
+    },
+    {
+      "name": "Auditoria"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de POST /auth/login."
+      }
+    },
+    "schemas": {
+      "Erro": {
+        "type": "object",
+        "required": [
+          "error",
+          "message",
+          "details",
+          "timestamp",
+          "path",
+          "requestId"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Codigo estavel do erro."
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "issue"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "issue": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Tambem enviado no cabecalho X-Request-Id."
+          }
+        }
+      },
+      "Paginacao": {
+        "type": "object",
+        "properties": {
+          "pagina": {
+            "type": "integer"
+          },
+          "limite": {
+            "type": "integer",
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "Centavos": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Valor monetario em centavos de real (inteiro). 2590 = R$ 25,90."
+      },
+      "Usuario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "papel": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "GERENTE",
+              "ATENDENTE",
+              "COZINHA",
+              "CLIENTE"
+            ]
+          },
+          "unidadeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "ativo": {
+            "type": "boolean"
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Cadastro": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nome",
+          "email",
+          "senha"
+        ],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "senha": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "writeOnly": true
+          }
+        }
+      },
+      "Login": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "senha"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "senha": {
+            "type": "string",
+            "writeOnly": true
+          }
+        }
+      },
+      "Sessao": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/Usuario"
+          }
+        }
+      },
+      "Unidade": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "cidade": {
+            "type": "string"
+          },
+          "ativa": {
+            "type": "boolean"
+          },
+          "criadoEm": {
+            "type": "string"
+          },
+          "atualizadoEm": {
+            "type": "string"
+          }
+        }
+      },
+      "UnidadeNova": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nome",
+          "cidade"
+        ],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "cidade": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          }
+        }
+      },
+      "UnidadeAlteracao": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "description": "GERENTE altera nome/cidade das proprias unidades; so ADMIN ativa ou desativa.",
+        "properties": {
+          "nome": {
+            "type": "string"
+          },
+          "cidade": {
+            "type": "string"
+          },
+          "ativa": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Produto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "categoria": {
+            "type": "string"
+          },
+          "ativo": {
+            "type": "boolean"
+          },
+          "criadoEm": {
+            "type": "string"
+          },
+          "atualizadoEm": {
+            "type": "string"
+          }
+        }
+      },
+      "ProdutoNovo": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nome",
+          "categoria"
+        ],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "descricao": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "categoria": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50
+          }
+        }
+      },
+      "ProdutoAlteracao": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "description": "Produto nao e apagado: desative com ativo=false.",
+        "properties": {
+          "nome": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "categoria": {
+            "type": "string"
+          },
+          "ativo": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ItemCardapio": {
+        "type": "object",
+        "properties": {
+          "produtoId": {
+            "type": "integer"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "categoria": {
+            "type": "string"
+          },
+          "precoCentavos": {
+            "$ref": "#/components/schemas/Centavos"
+          },
+          "disponivel": {
+            "type": "boolean"
+          },
+          "atualizadoEm": {
+            "type": "string"
+          }
+        }
+      },
+      "ItemCardapioAlteracao": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "description": "Para incluir um produto no cardapio da unidade, precoCentavos e obrigatorio.",
+        "properties": {
+          "precoCentavos": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "disponivel": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Saldo": {
+        "type": "object",
+        "properties": {
+          "unidadeId": {
+            "type": "integer"
+          },
+          "produtoId": {
+            "type": "integer"
+          },
+          "produtoNome": {
+            "type": "string"
+          },
+          "quantidadeTotal": {
+            "type": "integer"
+          },
+          "quantidadeReservada": {
+            "type": "integer"
+          },
+          "quantidadeDisponivel": {
+            "type": "integer"
+          },
+          "atualizadoEm": {
+            "type": "string"
+          }
+        }
+      },
+      "Movimentacao": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "unidadeId": {
+            "type": "integer"
+          },
+          "produtoId": {
+            "type": "integer"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "ENTRADA",
+              "AJUSTE",
+              "RESERVA",
+              "CONSUMO",
+              "LIBERACAO"
+            ]
+          },
+          "quantidade": {
+            "type": "integer"
+          },
+          "totalApos": {
+            "type": "integer"
+          },
+          "reservadaApos": {
+            "type": "integer"
+          },
+          "pedidoId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "usuarioId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "motivo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "criadoEm": {
+            "type": "string"
+          }
+        }
+      },
+      "MovimentacaoNova": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unidadeId",
+          "produtoId",
+          "tipo",
+          "quantidade"
+        ],
+        "description": "ENTRADA soma ao total (quantidade positiva). AJUSTE corrige o total (positivo ou negativo) e exige motivo. Nenhum dos dois deixa o total abaixo do reservado.",
+        "properties": {
+          "unidadeId": {
+            "type": "integer"
+          },
+          "produtoId": {
+            "type": "integer"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "ENTRADA",
+              "AJUSTE"
+            ]
+          },
+          "quantidade": {
+            "type": "integer",
+            "minimum": -100000,
+            "maximum": 100000,
+            "not": {
+              "const": 0
+            }
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          }
+        }
+      },
+      "PedidoNovo": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unidadeId",
+          "canalPedido",
+          "formaPagamento",
+          "itens"
+        ],
+        "description": "Preco, subtotal, desconto, total e status sao calculados pelo servidor; envia-los no corpo retorna 422.",
+        "properties": {
+          "unidadeId": {
+            "type": "integer"
+          },
+          "canalPedido": {
+            "type": "string",
+            "enum": [
+              "APP",
+              "TOTEM",
+              "BALCAO",
+              "PICKUP",
+              "WEB"
+            ],
+            "description": "BALCAO e registrado por funcionario."
+          },
+          "formaPagamento": {
+            "type": "string",
+            "enum": [
+              "MOCK"
+            ]
+          },
+          "clienteId": {
+            "type": "integer",
+            "description": "So para funcionario vincular um cliente. Cliente nunca informa: o id vem do token."
+          },
+          "pontosResgatar": {
+            "type": "integer",
+            "minimum": 10,
+            "multipleOf": 10,
+            "description": "Resgate de pontos pelo proprio cliente. 10 pontos = R$ 1,00; o desconto nao passa do subtotal."
+          },
+          "itens": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Cada produto aparece uma vez (produto repetido retorna 422).",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "produtoId",
+                "quantidade"
+              ],
+              "properties": {
+                "produtoId": {
+                  "type": "integer"
+                },
+                "quantidade": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99
+                }
+              }
+            }
+          }
+        }
+      },
+      "Pedido": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "unidadeId": {
+            "type": "integer"
+          },
+          "clienteId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "criadoPorId": {
+            "type": "integer"
+          },
+          "canalPedido": {
+            "type": "string",
+            "enum": [
+              "APP",
+              "TOTEM",
+              "BALCAO",
+              "PICKUP",
+              "WEB"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AGUARDANDO_PAGAMENTO",
+              "EM_PREPARO",
+              "PRONTO",
+              "ENTREGUE",
+              "CANCELADO"
+            ]
+          },
+          "formaPagamento": {
+            "type": "string"
+          },
+          "subtotalCentavos": {
+            "$ref": "#/components/schemas/Centavos"
+          },
+          "descontoCentavos": {
+            "$ref": "#/components/schemas/Centavos"
+          },
+          "totalCentavos": {
+            "$ref": "#/components/schemas/Centavos"
+          },
+          "reservaEstoque": {
+            "type": "string",
+            "enum": [
+              "ATIVA",
+              "CONSUMIDA",
+              "LIBERADA"
+            ]
+          },
+          "motivoCancelamento": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiraEm": {
+            "type": "string"
+          },
+          "criadoEm": {
+            "type": "string"
+          },
+          "atualizadoEm": {
+            "type": "string"
+          },
+          "pagoEm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prontoEm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entregueEm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canceladoEm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pontosResgatados": {
+            "type": "integer"
+          },
+          "resgateStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "RESERVADO",
+              "CONFIRMADO",
+              "LIBERADO",
+              null
+            ]
+          },
+          "itens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "produtoId": {
+                  "type": "integer"
+                },
+                "nomeProduto": {
+                  "type": "string"
+                },
+                "quantidade": {
+                  "type": "integer"
+                },
+                "precoUnitarioCentavos": {
+                  "$ref": "#/components/schemas/Centavos"
+                },
+                "totalCentavos": {
+                  "$ref": "#/components/schemas/Centavos"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Pagamento": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "pedidoId": {
+            "type": "integer"
+          },
+          "forma": {
+            "type": "string",
+            "enum": [
+              "MOCK"
+            ]
+          },
+          "valorCentavos": {
+            "$ref": "#/components/schemas/Centavos"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSANDO",
+              "APROVADO",
+              "RECUSADO",
+              "INDEFINIDO",
+              "APROVADO_TARDIO"
+            ],
+            "description": "INDEFINIDO: gateway nao respondeu no prazo; nao e aprovacao nem recusa. APROVADO_TARDIO: aprovado depois de o pedido ter sido cancelado; fica com estorno manual pendente."
+          },
+          "motivoRecusa": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referenciaGateway": {
+            "type": "string"
+          },
+          "codigoAutorizacao": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reconciliacao": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ESTORNO_MANUAL_PENDENTE",
+              null
+            ]
+          },
+          "criadoEm": {
+            "type": "string"
+          },
+          "atualizadoEm": {
+            "type": "string"
+          },
+          "finalizadoEm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tentativas": {
+            "type": "array",
+            "description": "So no GET /pagamentos/{id}.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "operacao": {
+                  "type": "string",
+                  "enum": [
+                    "AUTORIZACAO",
+                    "CONSULTA"
+                  ]
+                },
+                "resultado": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "APROVADO",
+                    "RECUSADO",
+                    "TIMEOUT",
+                    "ERRO",
+                    null
+                  ]
+                },
+                "payloadRequisicao": {
+                  "type": "object"
+                },
+                "payloadResposta": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "iniciadoEm": {
+                  "type": "string"
+                },
+                "finalizadoEm": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "ResultadoPagamento": {
+        "type": "object",
+        "properties": {
+          "pagamento": {
+            "$ref": "#/components/schemas/Pagamento"
+          },
+          "pedido": {
+            "$ref": "#/components/schemas/Pedido"
+          }
+        }
+      },
+      "Consentimento": {
+        "type": "object",
+        "properties": {
+          "finalidade": {
+            "type": "string",
+            "enum": [
+              "PROGRAMA_FIDELIDADE"
+            ]
+          },
+          "ativo": {
+            "type": "boolean"
+          },
+          "versaoTermo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "atualizadoEm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SaldoFidelidade": {
+        "type": "object",
+        "properties": {
+          "saldoPontos": {
+            "type": "integer"
+          },
+          "valorResgatavelCentavos": {
+            "$ref": "#/components/schemas/Centavos"
+          },
+          "consentimento": {
+            "$ref": "#/components/schemas/Consentimento"
+          },
+          "regra": {
+            "type": "object",
+            "properties": {
+              "pontosPorReal": {
+                "type": "integer"
+              },
+              "multiploResgate": {
+                "type": "integer"
+              },
+              "centavosPorMultiplo": {
+                "type": "integer"
+              },
+              "creditoQuando": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Lancamento": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "CREDITO",
+              "RESGATE",
+              "ESTORNO_RESGATE",
+              "BAIXA_ANONIMIZACAO"
+            ]
+          },
+          "pontos": {
+            "type": "integer"
+          },
+          "saldoApos": {
+            "type": "integer"
+          },
+          "pedidoId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "criadoEm": {
+            "type": "string"
+          }
+        }
+      },
+      "Auditoria": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "atorId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "atorPapel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acao": {
+            "type": "string"
+          },
+          "recursoTipo": {
+            "type": "string"
+          },
+          "recursoId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unidadeId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "SUCESSO",
+              "NEGADO",
+              "FALHA"
+            ]
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "detalhes": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "criadoEm": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Verifica se a API esta no ar",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API no ar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usuarios": {
+      "post": {
+        "tags": [
+          "Autenticacao"
+        ],
+        "summary": "Cadastro publico de cliente",
+        "security": [],
+        "description": "O papel e sempre CLIENTE. Campos como papel ou unidadeIds sao rejeitados.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Cadastro"
+              },
+              "example": {
+                "nome": "Carla Souza",
+                "email": "carla@exemplo.com",
+                "senha": "Senha@12345"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cliente criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON malformado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "JSON_MALFORMADO",
+                  "message": "O corpo da requisicao nao e um JSON valido.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "E-mail ja cadastrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "EMAIL_JA_CADASTRADO",
+                  "message": "Ja existe uma conta com este e-mail.",
+                  "details": [
+                    {
+                      "field": "email",
+                      "issue": "E-mail ja cadastrado."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/usuarios",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticacao"
+        ],
+        "summary": "Login com e-mail e senha",
+        "security": [],
+        "description": "Retorna um JWT (Bearer). A mensagem de erro nao diz se o e-mail existe. Apos varias falhas por IP + e-mail, responde 429 com Retry-After.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              },
+              "example": {
+                "email": "cliente.ana@demo.local",
+                "senha": "Demo@12345"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sessao"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON malformado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "JSON_MALFORMADO",
+                  "message": "O corpo da requisicao nao e um JSON valido.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Muitas tentativas de login (ver Retry-After).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "MUITAS_TENTATIVAS",
+                  "message": "Muitas tentativas de login. Tente novamente mais tarde.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/auth/login",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/me": {
+      "get": {
+        "tags": [
+          "Autenticacao"
+        ],
+        "summary": "Dados do usuario autenticado",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unidades": {
+      "get": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Lista unidades",
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Publico ve so unidades ativas. ADMIN pode filtrar por ativa=false.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "ativa",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unidades.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Unidade"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Cria unidade (ADMIN)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnidadeNova"
+              },
+              "example": {
+                "nome": "Unidade Aeroporto",
+                "cidade": "Curitiba"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Unidade criada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unidade"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com o estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "TRANSICAO_INVALIDA",
+                  "message": "Transicao de EM_PREPARO para ENTREGUE nao permitida.",
+                  "details": [
+                    {
+                      "field": "status",
+                      "issue": "Proximo status valido: PRONTO"
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unidades/{id}": {
+      "patch": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Altera unidade (ADMIN; GERENTE nas proprias unidades)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnidadeAlteracao"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unidade alterada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unidade"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com o estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "TRANSICAO_INVALIDA",
+                  "message": "Transicao de EM_PREPARO para ENTREGUE nao permitida.",
+                  "details": [
+                    {
+                      "field": "status",
+                      "issue": "Proximo status valido: PRONTO"
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unidades/{id}/cardapio": {
+      "get": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Cardapio da unidade com precos",
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "O preco e por unidade. incluirIndisponiveis so vale para ADMIN ou GERENTE da unidade.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "incluirIndisponiveis",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cardapio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unidade": {
+                      "$ref": "#/components/schemas/Unidade"
+                    },
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ItemCardapio"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unidades/{id}/cardapio/{produtoId}": {
+      "put": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Inclui ou altera produto no cardapio da unidade (ADMIN; GERENTE da unidade)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "produtoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemCardapioAlteracao"
+              },
+              "example": {
+                "precoCentavos": 2690,
+                "disponivel": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item do cardapio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemCardapio"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/produtos": {
+      "get": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Catalogo da rede",
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "ativo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Produtos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Produto"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Cria produto (ADMIN)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProdutoNovo"
+              },
+              "example": {
+                "nome": "Wrap de Frango",
+                "categoria": "LANCHE"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Produto criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Produto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com o estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "TRANSICAO_INVALIDA",
+                  "message": "Transicao de EM_PREPARO para ENTREGUE nao permitida.",
+                  "details": [
+                    {
+                      "field": "status",
+                      "issue": "Proximo status valido: PRONTO"
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/produtos/{id}": {
+      "patch": {
+        "tags": [
+          "Unidades e cardapio"
+        ],
+        "summary": "Altera ou desativa produto (ADMIN)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProdutoAlteracao"
+              },
+              "example": {
+                "ativo": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Produto alterado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Produto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com o estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "TRANSICAO_INVALIDA",
+                  "message": "Transicao de EM_PREPARO para ENTREGUE nao permitida.",
+                  "details": [
+                    {
+                      "field": "status",
+                      "issue": "Proximo status valido: PRONTO"
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/estoque": {
+      "get": {
+        "tags": [
+          "Estoque"
+        ],
+        "summary": "Saldos de estoque da unidade (funcionarios da unidade)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unidadeId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "produtoId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saldos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Saldo"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/estoque/movimentacoes": {
+      "get": {
+        "tags": [
+          "Estoque"
+        ],
+        "summary": "Historico de movimentacoes (ADMIN; GERENTE da unidade)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unidadeId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "produtoId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ENTRADA",
+                "AJUSTE",
+                "RESERVA",
+                "CONSUMO",
+                "LIBERACAO"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Movimentacoes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Movimentacao"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Estoque"
+        ],
+        "summary": "Registra entrada ou ajuste manual (ADMIN; GERENTE da unidade)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Reserva, consumo e liberacao nao sao manuais: vem do fluxo de pedido e pagamento.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MovimentacaoNova"
+              },
+              "example": {
+                "unidadeId": 1,
+                "produtoId": 3,
+                "tipo": "ENTRADA",
+                "quantidade": 20,
+                "motivo": "Nota fiscal 1234"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Movimentacao registrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "movimentacao": {
+                      "$ref": "#/components/schemas/Movimentacao"
+                    },
+                    "saldo": {
+                      "$ref": "#/components/schemas/Saldo"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "O ajuste deixaria o total abaixo do reservado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ESTOQUE_INSUFICIENTE",
+                  "message": "Estoque insuficiente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/estoque/movimentacoes",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pedidos": {
+      "post": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Cria pedido e reserva estoque",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Chave unica por tentativa logica (8 a 100 caracteres: letras, numeros, . _ : -). Repetir a mesma chave com o mesmo corpo devolve a resposta original com Idempotent-Replayed: true; com outro corpo retorna 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{8,100}$"
+            },
+            "example": "pedido-2026-10-28-0001"
+          }
+        ],
+        "description": "Precos vem do cardapio da unidade. O pedido nasce AGUARDANDO_PAGAMENTO, reserva o estoque e expira se nao for pago no prazo (PEDIDO_EXPIRACAO_MINUTOS).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedidoNovo"
+              },
+              "example": {
+                "unidadeId": 1,
+                "canalPedido": "APP",
+                "formaPagamento": "MOCK",
+                "itens": [
+                  {
+                    "produtoId": 1,
+                    "quantidade": 2
+                  },
+                  {
+                    "produtoId": 4,
+                    "quantidade": 1
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pedido criado (ou repeticao com a mesma chave).",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "Presente com valor true quando a resposta veio de uma requisicao anterior com a mesma chave.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pedido"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON malformado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "JSON_MALFORMADO",
+                  "message": "O corpo da requisicao nao e um JSON valido.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estoque insuficiente, produto indisponivel, unidade inativa, saldo de pontos insuficiente ou chave reutilizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ESTOQUE_INSUFICIENTE",
+                  "message": "Estoque insuficiente.",
+                  "details": [
+                    {
+                      "field": "itens[0].quantidade",
+                      "issue": "Disponivel: 1"
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Corpo acima de 32 kB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "CORPO_MUITO_GRANDE",
+                  "message": "O corpo da requisicao excede o limite permitido.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Lista pedidos com filtros",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "CLIENTE ve os proprios; funcionario ve os das suas unidades; ADMIN ve todos.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "unidadeId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AGUARDANDO_PAGAMENTO",
+                "EM_PREPARO",
+                "PRONTO",
+                "ENTREGUE",
+                "CANCELADO"
+              ]
+            }
+          },
+          {
+            "name": "canalPedido",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APP",
+                "TOTEM",
+                "BALCAO",
+                "PICKUP",
+                "WEB"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pedidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Pedido"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pedidos/{id}": {
+      "get": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Detalha pedido",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pedido"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pedidos/{id}/status": {
+      "patch": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Avanca o preparo: EM_PREPARO -> PRONTO (cozinha) -> ENTREGUE (atendente)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "description": "GERENTE e ADMIN podem fazer as duas etapas. Pular etapa, voltar ou repetir retorna 409. Na entrega o cliente com consentimento ganha os pontos (uma vez por pedido).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PRONTO",
+                      "ENTREGUE"
+                    ]
+                  }
+                }
+              },
+              "example": {
+                "status": "PRONTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pedido atualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pedido"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito com o estado atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "TRANSICAO_INVALIDA",
+                  "message": "Transicao de EM_PREPARO para ENTREGUE nao permitida.",
+                  "details": [
+                    {
+                      "field": "status",
+                      "issue": "Proximo status valido: PRONTO"
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pedidos/{id}/cancelamentos": {
+      "post": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Cancela pedido ainda nao pago",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "description": "Devolve a reserva de estoque e os pontos resgatados. Pedido pago nao e cancelado por aqui (estorno fora do escopo do MVP). COZINHA nao cancela.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 200
+                  }
+                }
+              },
+              "example": {
+                "motivo": "Cliente desistiu"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pedido cancelado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pedido"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ja cancelado, ja pago ou pagamento em processamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "CANCELAMENTO_APOS_PAGAMENTO",
+                  "message": "Pedido com pagamento confirmado nao pode ser cancelado por aqui.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pedidos/{id}/pagamentos": {
+      "post": {
+        "tags": [
+          "Pagamento"
+        ],
+        "summary": "Paga o pedido no gateway simulado",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Chave unica por tentativa logica (8 a 100 caracteres: letras, numeros, . _ : -). Repetir a mesma chave com o mesmo corpo devolve a resposta original com Idempotent-Replayed: true; com outro corpo retorna 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{8,100}$"
+            },
+            "example": "pedido-2026-10-28-0001"
+          },
+          {
+            "name": "X-Mock-Cenario",
+            "in": "header",
+            "required": false,
+            "description": "Somente desenvolvimento e teste (MOCK_PAGAMENTO_PERMITIR_CENARIO=true). Em producao o cabecalho e rejeitado com 422.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APROVAR",
+                "RECUSAR",
+                "TIMEOUT"
+              ]
+            }
+          }
+        ],
+        "description": "O valor e o total do pedido no servidor; o corpo e vazio. Status de resposta:\n- 201 APROVADO: pedido vai para EM_PREPARO e o estoque reservado e consumido.\n- 201 RECUSADO: motivo gravado, pedido cancelado, estoque e pontos devolvidos.\n- 202 INDEFINIDO: o gateway nao respondeu no prazo. Nao e aprovacao nem recusa; nova cobranca fica bloqueada ate a reconciliacao (npm run pagamentos:reconciliar).\nRepetir com a mesma Idempotency-Key devolve o mesmo pagamento sem cobrar de novo.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pagamento finalizado (APROVADO, RECUSADO ou APROVADO_TARDIO).",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "Presente com valor true quando a resposta veio de uma requisicao anterior com a mesma chave.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPagamento"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pagamento INDEFINIDO (timeout do gateway), aguardando reconciliacao.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "Presente com valor true quando a resposta veio de uma requisicao anterior com a mesma chave.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPagamento"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Pedido ja pago, cancelado, pagamento em andamento/indefinido ou chave reutilizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_JA_PAGO",
+                  "message": "O pedido ja tem pagamento confirmado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos/1/pagamentos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Pagamento"
+        ],
+        "summary": "Pagamentos do pedido",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pagamentos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Pagamento"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pagamentos/{id}": {
+      "get": {
+        "tags": [
+          "Pagamento"
+        ],
+        "summary": "Detalha pagamento com as tentativas no gateway",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pagamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagamento"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "PEDIDO_NAO_ENCONTRADO",
+                  "message": "Pedido nao encontrado.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fidelidade/saldo": {
+      "get": {
+        "tags": [
+          "Fidelidade"
+        ],
+        "summary": "Saldo de pontos e estado do consentimento (CLIENTE)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saldo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaldoFidelidade"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fidelidade/historico": {
+      "get": {
+        "tags": [
+          "Fidelidade"
+        ],
+        "summary": "Extrato de pontos (CLIENTE)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Extrato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Lancamento"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fidelidade/consentimento": {
+      "put": {
+        "tags": [
+          "Fidelidade"
+        ],
+        "summary": "Aceita o termo do programa de fidelidade (CLIENTE)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Idempotente. O historico de consentimentos e so de insercao.",
+        "responses": {
+          "200": {
+            "description": "Consentimento atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consentimento"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Fidelidade"
+        ],
+        "summary": "Revoga o consentimento (CLIENTE)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Idempotente. Sem consentimento o cliente nao ganha nem resgata pontos; o saldo fica congelado.",
+        "responses": {
+          "200": {
+            "description": "Consentimento atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consentimento"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auditorias": {
+      "get": {
+        "tags": [
+          "Auditoria"
+        ],
+        "summary": "Consulta trilha de auditoria (ADMIN; GERENTE so das suas unidades)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Itens por pagina (maximo 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "unidadeId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "acao",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z_]{3,60}$"
+            }
+          },
+          {
+            "name": "recursoTipo",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recursoId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dados",
+                    "paginacao"
+                  ],
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Auditoria"
+                      }
+                    },
+                    "paginacao": {
+                      "$ref": "#/components/schemas/Paginacao"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "NAO_AUTENTICADO",
+                  "message": "Token de acesso ausente.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou unidade sem permissao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "ACESSO_NEGADO",
+                  "message": "Voce nao tem permissao para esta operacao.",
+                  "details": [],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Dados de entrada invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "VALIDACAO",
+                  "message": "Dados de entrada invalidos.",
+                  "details": [
+                    {
+                      "field": "canalPedido",
+                      "issue": "Campo obrigatorio."
+                    }
+                  ],
+                  "timestamp": "2026-10-28T15:00:00.000Z",
+                  "path": "/pedidos",
+                  "requestId": "6f1c2a9e-3b7d-4c51-9a0e-2d8f4b6c1e73"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
