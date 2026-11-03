@@ -13,6 +13,7 @@ import { criarServicoIdempotencia } from './application/idempotencia.js';
 import { criarServicoPedidos } from './application/pedidos.js';
 import { criarCicloPedido } from './application/ciclo-pedido.js';
 import { criarServicoFidelidade } from './application/fidelidade.js';
+import { criarServicoLgpd } from './application/lgpd.js';
 import { criarServicoPagamentos } from './application/pagamentos.js';
 import { criarGatewayMock } from './infrastructure/pagamento/gateway-mock.js';
 import { autenticar } from './api/middlewares/autenticacao.js';
@@ -43,8 +44,9 @@ export function criarServicos(config, db, { gateway = criarGatewayMock(config.mo
   const pedidos = criarServicoPedidos({ db, config, auditoria, estoque, idempotencia, fidelidade });
   const ciclo = criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade });
   const pagamentos = criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, idempotencia, gateway });
+  const lgpd = criarServicoLgpd({ db, auditoria, fidelidade });
   return {
-    db, auditoria, senhas, tokens, usuarios, unidades, produtos, cardapio, estoque, idempotencia, pedidos, ciclo, pagamentos, fidelidade,
+    db, auditoria, senhas, tokens, usuarios, unidades, produtos, cardapio, estoque, idempotencia, pedidos, ciclo, pagamentos, fidelidade, lgpd,
   };
 }
 
