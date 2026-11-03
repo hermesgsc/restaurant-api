@@ -422,6 +422,14 @@ const fidelidade = {
       token: 'tokenCliente',
       testes: js(status(200), "pm.test('pontos devolvidos', () => pm.expect(pm.response.json().saldoPontos).to.eql(Number(pm.collectionVariables.get('pontosCliente'))));"),
     }),
+    requisicao('Resgate acima do saldo (409)', 'POST', '/pedidos', {
+      token: 'tokenCliente',
+      // proximo multiplo de 10 acima do saldo, ainda dentro do subtotal do pedido
+      antes: [novaChave('chaveTemp'), salvar('pontosAcimaDoSaldo', "(Math.floor(Number(pm.collectionVariables.get('pontosCliente')) / 10) + 1) * 10")],
+      cabecalhos: { 'Idempotency-Key': '{{chaveTemp}}' },
+      corpo: pedidoCentro([{ produtoId: '#produtoXBurgerId', quantidade: 1 }], { pontosResgatar: '#pontosAcimaDoSaldo' }),
+      testes: erro(409, 'PONTOS_INSUFICIENTES'),
+    }),
     requisicao('Revogar consentimento', 'DELETE', '/fidelidade/consentimento', {
       token: 'tokenCliente',
       testes: js(status(200), "pm.test('inativo', () => pm.expect(pm.response.json().ativo).to.be.false);"),

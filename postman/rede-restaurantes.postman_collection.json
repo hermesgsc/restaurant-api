@@ -3135,6 +3135,70 @@
           }
         },
         {
+          "name": "Resgate acima do saldo (409)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('chaveTemp', pm.variables.replaceIn('{{$guid}}'));",
+                  "pm.collectionVariables.set('pontosAcimaDoSaldo', (Math.floor(Number(pm.collectionVariables.get('pontosCliente')) / 10) + 1) * 10);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('envelope de erro PONTOS_INSUFICIENTES', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.error).to.eql('PONTOS_INSUFICIENTES');",
+                  "  pm.expect(b).to.have.all.keys('error', 'message', 'details', 'timestamp', 'path', 'requestId');",
+                  "  pm.expect(b.details).to.be.an('array');",
+                  "  pm.expect(b.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{chaveTemp}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidadeId\": {{unidadeCentroId}},\n  \"canalPedido\": \"APP\",\n  \"formaPagamento\": \"MOCK\",\n  \"pontosResgatar\": {{pontosAcimaDoSaldo}},\n  \"itens\": [\n    {\n      \"produtoId\": {{produtoXBurgerId}},\n      \"quantidade\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Revogar consentimento",
           "event": [
             {
