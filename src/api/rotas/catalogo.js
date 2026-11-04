@@ -25,7 +25,6 @@ const listaUnidades = z.strictObject({ ...paginacao, ativa: booleanoQuery.option
 const listaProdutos = z.strictObject({ ...paginacao, ativo: booleanoQuery.optional(), categoria: z.string().max(50).optional() });
 const listaCardapio = z.strictObject({ ...paginacao, incluirIndisponiveis: booleanoQuery.optional() });
 
-// autenticacao opcional: rota publica que mostra mais coisa pra quem tem papel
 export function rotasCatalogo({ servicos, autenticar, autenticarOpcional }) {
   const r = Router();
   const gestores = exigirPapeis(Papel.ADMIN, Papel.GERENTE);

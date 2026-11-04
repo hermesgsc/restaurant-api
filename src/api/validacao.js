@@ -9,9 +9,7 @@ function caminho(path) {
   return path.reduce((acc, parte) => (typeof parte === 'number' ? `${acc}[${parte}]` : acc ? `${acc}.${parte}` : String(parte)), '');
 }
 
-// traduz as issues do zod pro formato {field, issue} do envelope de erro
 function descrever(issue) {
-  // campo ausente pode chegar como invalid_type ou invalid_value (enum), depende do schema
   if (issue.input === undefined && (issue.code === 'invalid_type' || issue.code === 'invalid_value')) return 'Campo obrigatorio.';
   switch (issue.code) {
     case 'invalid_type':
@@ -38,7 +36,6 @@ function descrever(issue) {
 }
 
 export function validar(schema, dados, origem = 'body') {
-  // reportInput deixa saber se o campo veio vazio; o valor recebido nunca vai pra resposta
   const resultado = schema.safeParse(dados ?? {}, { reportInput: true });
   if (resultado.success) return resultado.data;
   const detalhes = [];
@@ -52,7 +49,6 @@ export function validar(schema, dados, origem = 'body') {
   throw erros.validacao('VALIDACAO', 'Dados de entrada invalidos.', detalhes);
 }
 
-// query string chega como texto, por isso o coerce
 export const idParam = z.coerce.number().int().positive();
 
 export const esquemaId = z.strictObject({ id: idParam });
@@ -76,7 +72,6 @@ export function lerChaveIdempotencia(req) {
   return chave;
 }
 
-// resposta que veio de uma requisicao anterior com a mesma chave
 export function marcarRepeticao(res, resultado) {
   if (resultado.repetida) res.set('Idempotent-Replayed', 'true');
 }

@@ -41,8 +41,6 @@ function opcao(env, nome, padrao, opcoes) {
   return valor;
 }
 
-// validade do token no formato do jsonwebtoken. numero puro e lido em segundos;
-// passado como string o jsonwebtoken entenderia milissegundos
 function duracao(env, nome, padrao) {
   const valor = env[nome] || padrao;
   if (/^\d+$/.test(valor)) return Number(valor);
@@ -50,8 +48,6 @@ function duracao(env, nome, padrao) {
   throw new ErroConfiguracao(`${nome} deve ser um numero de segundos ou um valor como 30m, 1h ou 7d.`);
 }
 
-// le o .env e as variaveis do processo (o processo ganha). os testes passam
-// `sobrescrever` pra isolar banco e segredo. sem JWT_SECRET a api nem sobe.
 export function carregarConfig(sobrescrever = {}, { lerEnv = true } = {}) {
   const raiz = path.resolve(import.meta.dirname, '..');
   const env = { ...(lerEnv ? lerArquivoEnv(path.join(raiz, '.env')) : {}), ...process.env, ...sobrescrever };
@@ -82,7 +78,6 @@ export function carregarConfig(sobrescrever = {}, { lerEnv = true } = {}) {
     mockPagamento: Object.freeze({
       latenciaMs: inteiro(env, 'MOCK_PAGAMENTO_LATENCIA_MS', 50, 0, 60000),
       cenarioPadrao: opcao(env, 'MOCK_PAGAMENTO_CENARIO_PADRAO', 'APROVAR', CENARIOS_MOCK),
-      // seletor de cenario e coisa do mock, em producao fica sempre desligado
       permitirCenario: ambiente === 'production' ? false : permitirCenario,
       resultadoConsulta: opcao(env, 'MOCK_PAGAMENTO_RESULTADO_CONSULTA', 'APROVADO', ['APROVADO', 'RECUSADO', 'TIMEOUT']),
     }),

@@ -9,7 +9,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-// percorre a pilha do express (inclusive os routers montados) e devolve "METODO /caminho"
 function rotasDoExpress(app) {
   const rotas = [];
   const visitar = (pilha) => {

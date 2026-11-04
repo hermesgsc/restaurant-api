@@ -1,6 +1,5 @@
 import { iniciarComando } from './comum.js';
 
-// cancela pedidos AGUARDANDO_PAGAMENTO vencidos e devolve a reserva de estoque
 const { db, servicos } = iniciarComando();
 try {
   const resumo = servicos.ciclo.expirarVencidos();

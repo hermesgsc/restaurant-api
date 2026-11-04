@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { esquemaId, idParam, lerChaveIdempotencia, marcarRepeticao, paginacao, validar, z } from '../validacao.js';
 import { CANAIS_PEDIDO, LIMITES_PEDIDO, STATUS_PEDIDO } from '../../domain/pedido.js';
 
-// strictObject barra precoCentavos, totalCentavos, desconto ou status no corpo
 const novoPedido = z.strictObject({
   unidadeId: z.int().positive(),
   canalPedido: z.enum(CANAIS_PEDIDO),
@@ -22,7 +21,6 @@ const filtrosPedidos = z.strictObject({
   canalPedido: z.enum(CANAIS_PEDIDO).optional(),
 });
 
-// so as etapas manuais; EM_PREPARO vem do pagamento e CANCELADO do cancelamento
 const novoStatus = z.strictObject({ status: z.enum(['PRONTO', 'ENTREGUE']) });
 const cancelamento = z.strictObject({ motivo: z.string().trim().min(3).max(200).optional() });
 

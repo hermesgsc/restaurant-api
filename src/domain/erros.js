@@ -7,7 +7,6 @@ export const TipoErro = Object.freeze({
   LIMITE_EXCEDIDO: 'LIMITE_EXCEDIDO',
 });
 
-// erro de negocio nao sabe nada de http, quem traduz o tipo em status e a camada api
 export class ErroNegocio extends Error {
   constructor(tipo, codigo, mensagem, detalhes = []) {
     super(mensagem);

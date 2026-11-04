@@ -1,7 +1,6 @@
 import { iniciarComando } from './comum.js';
 import { ErroNegocio } from '../src/domain/erros.js';
 
-// uso: npm run lgpd:anonimizar -- <usuarioId>
 const usuarioId = Number(process.argv[2]);
 if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
   console.error('Uso: npm run lgpd:anonimizar -- <usuarioId>');

@@ -1,5 +1,3 @@
-// tudo em centavos inteiros de brl, nenhuma conta passa por float
-
 export function validarCentavos(valor) {
   if (!Number.isSafeInteger(valor) || valor < 0) {
     throw new RangeError(`Valor monetario invalido: ${valor}`);

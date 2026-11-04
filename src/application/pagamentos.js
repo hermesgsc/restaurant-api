@@ -7,8 +7,6 @@ import { StatusPedido } from '../domain/pedido.js';
 import { STATUS_PAGAMENTO_VIVO, StatusPagamento } from '../domain/pagamento.js';
 import { MotivoCancelamento } from './ciclo-pedido.js';
 
-// status http da resposta de POST /pedidos/{id}/pagamentos. recusa de negocio
-// nao e erro de transporte: o pagamento foi registrado, so que recusado.
 const STATUS_HTTP = { APROVADO: 201, RECUSADO: 201, APROVADO_TARDIO: 201, INDEFINIDO: 202 };
 
 function paraPagamento(l, tentativas) {
@@ -79,9 +77,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
     }
   }
 
-  // fase 1 (transacao curta): confere tudo, grava a chave de idempotencia como
-  // EM_PROCESSAMENTO, o pagamento como PROCESSANDO e a tentativa com o payload.
-  // o indice unico de pagamento vivo impede dois pagamentos ao mesmo tempo.
   function registrarIntencao(ator, pedidoId, { chave, cenario, requestId }) {
     const dadosIdem = { pedidoId, cenario: cenario ?? null };
     return transacao(db, () => {
@@ -90,7 +85,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
         return { repetida: true, status: registro.status_http, corpo: JSON.parse(registro.corpo_resposta) };
       }
       if (registro) {
-        // retry depois de timeout: devolve o estado atual (INDEFINIDO) sem cobrar de novo
         const anterior = buscarPorIdempotencia.get(registro.id);
         if (anterior?.status === StatusPagamento.INDEFINIDO) {
           return { repetida: true, status: STATUS_HTTP.INDEFINIDO, corpo: respostaPagamento(anterior.id) };
@@ -116,7 +110,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
     });
   }
 
-  // chamada ao gateway sem nenhuma transacao aberta
   async function chamarGateway(operacao, dados) {
     try {
       const resposta = await chamarComTimeout((signal) => gateway[operacao](dados, { signal }), config.pagamentoTimeoutMs);
@@ -127,9 +120,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
     }
   }
 
-  // fase 2 (transacao curta): aplica o resultado com UPDATE condicionado ao
-  // status anterior. se dois processos tentarem finalizar o mesmo pagamento
-  // (resposta original e reconciliacao), so um aplica os efeitos.
   function finalizar(pagamentoId, tentativaId, { resultado, resposta }, { ator, requestId }) {
     return transacao(db, () => {
       const instante = agora();
@@ -143,16 +133,12 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
       if (resultado === 'APROVADO') {
         const confirmou = ciclo.confirmarPagamento(pagamento.pedido_id, ator?.id ?? null);
         novoStatus = confirmou ? StatusPagamento.APROVADO : StatusPagamento.APROVADO_TARDIO;
-        // pedido ja cancelado/expirado: nao volta a existir. a cobranca fica
-        // marcada pra estorno manual, que esta fora do escopo do mvp
         if (!confirmou) reconciliacao = 'ESTORNO_MANUAL_PENDENTE';
       } else if (resultado === 'RECUSADO') {
         novoStatus = StatusPagamento.RECUSADO;
         motivo = resposta.motivo ?? 'RECUSADO_PELO_GATEWAY';
       } else {
-        // timeout ou erro de comunicacao: nao sabemos o resultado
         novoStatus = StatusPagamento.INDEFINIDO;
-        // reconciliacao que tambem ficou sem resposta: continua como estava
         if (pagamento.status === StatusPagamento.INDEFINIDO) {
           db.prepare('UPDATE pagamentos SET atualizado_em = ? WHERE id = ?').run(instante, pagamentoId);
           return novoStatus;
@@ -186,7 +172,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
   }
 
   async function pagar(ator, pedidoId, { chave, cenario, requestId }) {
-    // se o pedido ja venceu, expira antes de tentar cobrar
     pedidos.exigirAcesso(ator, pedidos.obterLinha(pedidoId), requestId);
     ciclo.expirarSeVencido(pedidoId);
 
@@ -195,7 +180,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
 
     const retorno = await chamarGateway('autorizar', { referencia: intencao.referencia, valorCentavos: intencao.valorCentavos, cenario });
     const status = finalizar(intencao.pagamentoId, intencao.tentativaId, retorno, { ator, requestId });
-    // no timeout (INDEFINIDO, 202) a chave continua EM_PROCESSAMENTO ate a reconciliacao decidir
     return { status: STATUS_HTTP[status], corpo: respostaPagamento(intencao.pagamentoId), repetida: false };
   }
 
@@ -211,8 +195,6 @@ export function criarServicoPagamentos({ db, config, auditoria, pedidos, ciclo, 
     return { dados: buscarDoPedido.all(pedidoId).map((l) => paraPagamento(l)) };
   }
 
-  // consulta o gateway pros pagamentos INDEFINIDO e pros PROCESSANDO parados
-  // ha mais tempo que `idadeMinimaMs` (ex.: processo caiu entre as fases).
   async function reconciliar({ idadeMinimaMs = config.pagamentoTimeoutMs * 2 } = {}) {
     const limite = new Date(Date.now() - idadeMinimaMs).toISOString();
     const pendentes = db.prepare(`SELECT id, referencia_gateway FROM pagamentos

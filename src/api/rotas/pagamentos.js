@@ -3,12 +3,8 @@ import { esquemaId, lerChaveIdempotencia, marcarRepeticao, validar, z } from '..
 import { erros } from '../../domain/erros.js';
 import { CENARIOS_MOCK } from '../../infrastructure/pagamento/gateway-mock.js';
 
-// o corpo e vazio de proposito: valor e forma vem do pedido no servidor
 const corpoPagamento = z.strictObject({});
 
-// X-Mock-Cenario so e aceito quando a configuracao permite (dev/teste).
-// em producao o cabecalho e rejeitado em vez de ignorado, pra ninguem achar
-// que escolheu o resultado do pagamento
 function lerCenario(req, config) {
   const cenario = req.get('x-mock-cenario');
   if (cenario === undefined) return undefined;

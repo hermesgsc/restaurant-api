@@ -3,8 +3,6 @@ import { validar, z } from '../validacao.js';
 
 const esquemaCadastro = z.strictObject({
   nome: z.string().trim().min(2).max(100),
-  // .invalid e reservado pra anonimizacao lgpd. se o cadastro aceitasse,
-  // alguem podia ocupar o e-mail anonimizado de outro titular e travar o pedido dele
   email: z.email().max(254).transform((e) => e.toLowerCase())
     .refine((e) => !e.endsWith('.invalid'), 'Dominio de e-mail nao permitido.'),
   senha: z.string().min(8).max(72),

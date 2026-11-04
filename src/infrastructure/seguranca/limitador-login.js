@@ -1,5 +1,3 @@
-// limitador em memoria por chave (ip + e-mail). serve pra demo local com um
-// processo so; com varias instancias teria que ir pra um armazenamento comum.
 export function criarLimitadorLogin({ maxTentativas, janelaMs }, relogio = () => Date.now()) {
   const falhas = new Map();
 
@@ -10,8 +8,6 @@ export function criarLimitadorLogin({ maxTentativas, janelaMs }, relogio = () =>
   }
 
   return {
-    // checa e ja conta a tentativa antes da senha ser conferida. contar so
-    // depois do bcrypt deixava uma rajada de requisicoes em paralelo passar inteira
     tentar(chave) {
       const instante = relogio();
       const registro = limpar(chave, instante) ?? { inicio: instante, total: 0 };

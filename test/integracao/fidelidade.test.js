@@ -13,9 +13,7 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-
 let contador = 0;
-// cada teste usa um cliente novo pra o saldo de um nao interferir no outro
 async function novoCliente() {
   contador += 1;
   const email = `fiel${contador}-${crypto.randomUUID().slice(0, 8)}@teste.local`;
@@ -58,7 +56,6 @@ async function pedidoEntregue(token, opcoes) {
 
 const saldo = async (token) => (await amb.chamar('GET', '/fidelidade/saldo', { token })).corpo;
 
-// da pontos direto pelo servico, como se viessem de pedidos antigos
 function darPontos(usuarioId, pontos) {
   amb.db.prepare("INSERT INTO fidelidade_contas (usuario_id, saldo_pontos, criado_em, atualizado_em) VALUES (?, 0, 'x', 'x') ON CONFLICT DO NOTHING").run(usuarioId);
   amb.db.prepare('UPDATE fidelidade_contas SET saldo_pontos = saldo_pontos + ? WHERE usuario_id = ?').run(pontos, usuarioId);
@@ -108,7 +105,6 @@ describe('credito na entrega', () => {
   test('credita 1 ponto por real inteiro so quando o pedido e ENTREGUE', async () => {
     const c = await novoCliente();
     await consentir(c.token);
-    // 2 x 25,90 + 1 x 6,90 = 58,70 -> 58 pontos
     const pedido = (await criarPedido(c.token, { itens: [{ produtoId: p['X-Burger'], quantidade: 2 }, { produtoId: p['Refrigerante Lata'], quantidade: 1 }] })).corpo;
     assert.equal(pedido.totalCentavos, 5870);
     await pagar(c.token, pedido.id);
@@ -134,7 +130,6 @@ describe('credito na entrega', () => {
     const repetida = await amb.chamar('PATCH', `/pedidos/${entregue.id}/status`, { token: await amb.login(EMAILS.atendenteCentro), corpo: { status: 'ENTREGUE' } });
     assert.equal(repetida.status, 409);
     assert.equal((await saldo(c.token)).saldoPontos, 51);
-    // chamar o credito direto de novo tambem nao duplica
     assert.equal(amb.servicos.fidelidade.creditarEntrega(entregue.id, { ator: null, requestId: 'teste' }), 0);
     assert.throws(() => amb.db.prepare(`INSERT INTO fidelidade_lancamentos (usuario_id, pedido_id, tipo, pontos, saldo_apos, descricao, criado_em)
       VALUES (?, ?, 'CREDITO', 1, 1, 'dup', 'x')`).run(c.id, entregue.id), /UNIQUE/);
@@ -188,7 +183,6 @@ describe('resgate de pontos', () => {
     const pago = await pagar(c.token, r.corpo.id);
     assert.equal(pago.corpo.pagamento.valorCentavos, 4880);
     assert.equal(pago.corpo.pedido.resgateStatus, 'CONFIRMADO');
-    // credito na entrega e sobre o valor pago: 48,80 -> 48 pontos
     await entregar(r.corpo.id);
     assert.equal((await saldo(c.token)).saldoPontos, 45 + 48);
   });
@@ -246,7 +240,6 @@ describe('resgate de pontos', () => {
     const multiplo = await criarPedido(c.token, { pontosResgatar: 15 });
     assert.equal(multiplo.status, 422);
     assert.deepEqual(multiplo.corpo.details, [{ field: 'pontosResgatar', issue: 'Deve ser multiplo de 10.' }]);
-    // subtotal de 1 x-burger = 25,90 -> no maximo 250 pontos
     const acima = await criarPedido(c.token, { itens: [{ produtoId: p['X-Burger'], quantidade: 1 }], pontosResgatar: 260 });
     assert.equal(acima.status, 422);
     assert.equal(acima.corpo.error, 'RESGATE_ACIMA_DO_SUBTOTAL');

@@ -1,6 +1,3 @@
--- usuarios, unidades, catalogo, cardapio por unidade e auditoria.
--- datas em texto iso 8601 utc; dinheiro em centavos inteiros.
-
 CREATE TABLE unidades (
   id            INTEGER PRIMARY KEY,
   nome          TEXT    NOT NULL UNIQUE,
@@ -22,7 +19,6 @@ CREATE TABLE usuarios (
   atualizado_em  TEXT    NOT NULL
 );
 
--- escopo dos funcionarios; admin nao precisa de vinculo porque atua na rede toda
 CREATE TABLE usuario_unidades (
   usuario_id INTEGER NOT NULL REFERENCES usuarios (id),
   unidade_id INTEGER NOT NULL REFERENCES unidades (id),
@@ -51,7 +47,6 @@ CREATE TABLE cardapio_itens (
   UNIQUE (unidade_id, produto_id)
 );
 
--- trilha de auditoria: sem senha, token, e-mail ou nome do titular
 CREATE TABLE auditorias (
   id           INTEGER PRIMARY KEY,
   ator_id      INTEGER REFERENCES usuarios (id),

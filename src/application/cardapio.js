@@ -24,7 +24,6 @@ export function criarServicoCardapio({ db, auditoria, unidades, produtos }) {
     FROM cardapio_itens c JOIN produtos p ON p.id = c.produto_id
     WHERE c.unidade_id = ?`;
 
-  // cliente ve so o que pode pedir agora; quem gerencia a unidade ve tudo
   function listar(ator, unidadeId, { incluirIndisponiveis, pagina, limite }) {
     const unidade = unidades.obter(unidadeId);
     const gestor = ator && podeGerenciarUnidade(ator, unidadeId);
@@ -40,7 +39,6 @@ export function criarServicoCardapio({ db, auditoria, unidades, produtos }) {
     };
   }
 
-  // upsert: coloca o produto no cardapio da unidade ou muda preco/disponibilidade
   function definirItem(ator, unidadeId, produtoId, { precoCentavos, disponivel }, requestId) {
     unidades.obter(unidadeId);
     if (!podeGerenciarUnidade(ator, unidadeId)) throw erros.proibido();

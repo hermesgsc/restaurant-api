@@ -13,8 +13,6 @@ export function abrirBanco(arquivo) {
   return db;
 }
 
-// aplica em ordem os .sql da pasta migrations que ainda nao rodaram.
-// cada arquivo roda numa transacao propria, se falhar nada dele fica no banco.
 export function migrar(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS schema_migracoes (
     versao TEXT PRIMARY KEY,
@@ -35,10 +33,6 @@ export function migrar(db) {
   return novas;
 }
 
-// BEGIN IMMEDIATE pega o lock de escrita logo no inicio. junto com o fato do
-// node:sqlite ser sincrono, duas requisicoes nunca intercalam dentro da mesma
-// transacao, e outro processo (ex. o comando de expiracao) espera o busy_timeout.
-// a funcao passada nao pode ser async: nada de await com transacao aberta.
 export function transacao(db, fn) {
   if (db.isTransaction) return fn();
   db.exec('BEGIN IMMEDIATE');
@@ -53,19 +47,16 @@ export function transacao(db, fn) {
   }
 }
 
-// `?` pra cada item de um IN (...). lista vazia vira NULL, que nao casa com nada
 export function placeholders(lista) {
   return lista.map(() => '?').join(',') || 'NULL';
 }
 
-// listagem paginada: `de` e o trecho FROM ... WHERE ... e `params` os valores dele
 export function paginar(db, { colunas = '*', de, params = [], ordem, pagina, limite }) {
   const total = db.prepare(`SELECT COUNT(*) AS total ${de}`).get(...params).total;
   const linhas = db.prepare(`SELECT ${colunas} ${de} ORDER BY ${ordem} LIMIT ? OFFSET ?`).all(...params, limite, (pagina - 1) * limite);
   return { linhas, paginacao: { pagina, limite, total } };
 }
 
-// troca a violacao de UNIQUE de `tabela.coluna` pelo erro de negocio; qualquer outro erro passa igual
 export function traduzirUnico(erro, coluna, criarErro) {
   return String(erro?.message).includes(`UNIQUE constraint failed: ${coluna}`) ? criarErro() : erro;
 }

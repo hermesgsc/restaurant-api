@@ -9,9 +9,6 @@ function paraLancamento(l) {
   return { id: l.id, tipo: l.tipo, pontos: l.pontos, saldoApos: l.saldo_apos, pedidoId: l.pedido_id, descricao: l.descricao, criadoEm: l.criado_em };
 }
 
-// pontos so existem com consentimento ativo. revogar nao apaga o saldo: ele
-// fica congelado (sem credito novo e sem resgate) ate o cliente consentir de
-// novo ou pedir a anonimizacao, que zera a conta.
 export function criarServicoFidelidade({ db, config, auditoria }) {
   const ultimoConsentimento = db.prepare('SELECT * FROM consentimentos WHERE usuario_id = ? AND finalidade = ? ORDER BY id DESC LIMIT 1');
   const inserirConsentimento = db.prepare(`INSERT INTO consentimentos (usuario_id, finalidade, versao_termo, acao, origem, request_id, criado_em)
@@ -32,8 +29,6 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
     return buscarConta.get(usuarioId)?.saldo_pontos ?? 0;
   }
 
-  // unico caminho que mexe no saldo: UPDATE condicionado (saldo nunca negativo)
-  // e lancamento no extrato na mesma transacao
   function lancar(usuarioId, pedidoId, tipo, pontos, descricao) {
     return transacao(db, () => {
       const instante = agora();
@@ -72,7 +67,6 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
     });
   }
 
-  // conceder ou revogar de novo nao cria linha repetida: devolve o estado atual
   function conceder(ator, requestId) {
     exigirCliente(ator);
     return transacao(db, () => {
@@ -116,8 +110,6 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
     return { dados: linhas.map(paraLancamento), paginacao };
   }
 
-  // chamado dentro da transacao de criacao do pedido: debita os pontos na hora,
-  // pra dois pedidos simultaneos nao gastarem o mesmo saldo
   function reservarResgate({ ator, clienteId, pedidoId, pontos, subtotalCentavos }) {
     if (ator.papel !== Papel.CLIENTE) throw erros.proibido('O resgate de pontos e feito pelo proprio cliente.');
     const desconto = descontoDoResgate(pontos, subtotalCentavos);
@@ -135,7 +127,6 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
       .run(StatusResgate.CONFIRMADO, pedidoId, StatusResgate.RESERVADO);
   }
 
-  // pedido cancelado, recusado ou expirado devolve os pontos uma vez so
   function liberarResgate(pedidoId) {
     const r = db.prepare('UPDATE pedidos SET resgate_status = ? WHERE id = ? AND resgate_status = ?')
       .run(StatusResgate.LIBERADO, pedidoId, StatusResgate.RESERVADO);
@@ -145,8 +136,6 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
     return true;
   }
 
-  // credito na entrega: so cliente identificado, com consentimento ativo, e uma
-  // vez por pedido (o indice unico pedido+tipo garante mesmo em corrida)
   function creditarEntrega(pedidoId, { ator, requestId }) {
     const pedido = buscarPedido.get(pedidoId);
     if (!pedido.cliente_id || !consentimentoAtivo(pedido.cliente_id)) return 0;
@@ -160,7 +149,6 @@ export function criarServicoFidelidade({ db, config, auditoria }) {
     return pontos;
   }
 
-  // usado pela anonimizacao: revoga o consentimento e zera o saldo
   function encerrarParaAnonimizacao(usuarioId, { ator, requestId }) {
     if (consentimentoAtivo(usuarioId)) registrarConsentimento(usuarioId, 'REVOGADO', { origem: 'ANONIMIZACAO', requestId, ator });
     const pontos = saldoDe(usuarioId);

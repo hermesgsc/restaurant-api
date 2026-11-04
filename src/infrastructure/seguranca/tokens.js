@@ -12,8 +12,6 @@ export function criarServicoTokens({ segredo, expiracao }) {
         subject: String(usuario.id),
       });
     },
-    // so aceita hs256 do nosso emissor e com exp valido; papel e unidades
-    // sao recarregados do banco depois, o token so prova quem e o usuario
     verificar(token) {
       const dados = jwt.verify(token, segredo, { algorithms: ['HS256'], issuer: EMISSOR });
       const id = Number(dados.sub);

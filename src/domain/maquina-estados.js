@@ -4,8 +4,6 @@ import { StatusPedido } from './pedido.js';
 
 const { AGUARDANDO_PAGAMENTO, EM_PREPARO, PRONTO, ENTREGUE, CANCELADO } = StatusPedido;
 
-// transicoes possiveis e por onde cada uma acontece.
-// PAGAMENTO e SISTEMA nao sao papeis: sao o fluxo de pagamento e o cancelamento/expiracao.
 export const TRANSICOES = Object.freeze([
   { de: AGUARDANDO_PAGAMENTO, para: EM_PREPARO, via: 'PAGAMENTO', papeis: [] },
   { de: AGUARDANDO_PAGAMENTO, para: CANCELADO, via: 'CANCELAMENTO', papeis: [Papel.CLIENTE, Papel.ATENDENTE, Papel.GERENTE, Papel.ADMIN] },
@@ -13,9 +11,6 @@ export const TRANSICOES = Object.freeze([
   { de: PRONTO, para: ENTREGUE, via: 'STATUS', papeis: [Papel.ATENDENTE, Papel.GERENTE, Papel.ADMIN] },
 ]);
 
-// usado pelo PATCH /pedidos/{id}/status. so EM_PREPARO -> PRONTO -> ENTREGUE
-// passa por aqui; qualquer outra combinacao (pular etapa, voltar, repetir
-// ENTREGUE) e 409. papel sem permissao pra transicao e 403.
 export function validarTransicaoManual(de, para, papel) {
   const transicao = TRANSICOES.find((t) => t.de === de && t.para === para);
   if (!transicao || transicao.via !== 'STATUS') {

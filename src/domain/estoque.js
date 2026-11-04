@@ -12,10 +12,6 @@ export function disponivel(saldo) {
   return saldo.total - saldo.reservada;
 }
 
-// regra central do estoque: recebe o saldo atual e devolve o novo, ou lanca
-// erro se o movimento deixaria algo negativo ou reservaria mais que o disponivel.
-// a reserva separa a unidade pro pedido; o consumo baixa total e reserva juntos
-// quando o pagamento aprova; a liberacao devolve a reserva sem mexer no total.
 export function aplicarMovimento(saldo, tipo, quantidade) {
   if (!Number.isSafeInteger(quantidade) || quantidade === 0) throw new RangeError('quantidade invalida');
   if (tipo !== TipoMovimento.AJUSTE && quantidade < 0) throw new RangeError('quantidade deve ser positiva');

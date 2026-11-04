@@ -20,10 +20,7 @@ export function envelopeErro(req, codigo, mensagem, detalhes = []) {
   };
 }
 
-// ponto unico de saida de erro: tudo vira o mesmo envelope, inclusive json
-// malformado, corpo grande demais e excecao inesperada (que vira 500 sem stack)
 export function tratadorErros(logger) {
-  // eslint-disable-next-line no-unused-vars
   return (erro, req, res, _next) => {
     if (erro instanceof ErroNegocio) {
       const status = STATUS_POR_TIPO[erro.tipo] ?? 400;
@@ -39,7 +36,6 @@ export function tratadorErros(logger) {
     if (erro?.type === 'encoding.unsupported' || erro?.type === 'charset.unsupported') {
       return res.status(415).json(envelopeErro(req, 'CODIFICACAO_NAO_SUPORTADA', 'Codificacao do corpo nao suportada.'));
     }
-    // o router do express 5 lanca URIError quando um parametro da rota tem % malformado (ex. /pedidos/%ZZ)
     if (erro instanceof URIError) {
       return res.status(400).json(envelopeErro(req, 'PARAMETRO_MALFORMADO', 'A URL tem um parametro com codificacao invalida.'));
     }

@@ -2,8 +2,6 @@ import { agora, paginar, placeholders } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 import { Papel } from '../domain/papeis.js';
 
-// grava so o necessario pra rastrear: quem, o que, em qual recurso/unidade,
-// quando e o requestId. nunca senha, token, e-mail ou nome.
 export function criarAuditoria(db) {
   const inserir = db.prepare(`INSERT INTO auditorias
     (ator_id, ator_papel, acao, recurso_tipo, recurso_id, unidade_id, resultado, request_id, detalhes, criado_em)
@@ -24,7 +22,6 @@ export function criarAuditoria(db) {
     );
   }
 
-  // admin ve tudo; gerente so as unidades dele e nunca registros sem unidade
   function listar(ator, filtros, { pagina, limite }) {
     if (ator.papel !== Papel.ADMIN && ator.papel !== Papel.GERENTE) throw erros.proibido();
     const condicoes = [];

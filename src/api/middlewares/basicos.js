@@ -3,7 +3,6 @@ import { envelopeErro } from '../http-erros.js';
 
 const REQUEST_ID_VALIDO = /^[A-Za-z0-9._-]{8,64}$/;
 
-// aceita o X-Request-Id do cliente se for seguro, senao gera um novo
 export function requestId() {
   return (req, res, next) => {
     const recebido = req.get('x-request-id');
@@ -13,7 +12,6 @@ export function requestId() {
   };
 }
 
-// log sem corpo, sem query e sem cabecalho de autorizacao
 export function logRequisicoes(logger) {
   return (req, res, next) => {
     const inicio = process.hrtime.bigint();
@@ -41,7 +39,6 @@ export function cabecalhosSeguranca() {
   };
 }
 
-// cors so pras origens configuradas, sem coringa
 export function cors(origens) {
   return (req, res, next) => {
     const origem = req.get('origin');

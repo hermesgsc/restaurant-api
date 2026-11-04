@@ -4,7 +4,6 @@ import { criarAmbiente, EMAILS, novaChave } from '../apoio/ambiente.js';
 import { criarGatewayMock } from '../../src/infrastructure/pagamento/gateway-mock.js';
 import { carregarConfig } from '../../src/config.js';
 
-// gateway do teste: autorizacao do mock normal, consulta controlada pelo teste
 const consulta = { resultado: 'APROVADO' };
 const mock = criarGatewayMock({ latenciaMs: 5, cenarioPadrao: 'APROVAR', resultadoConsulta: 'APROVADO' });
 const gateway = {
@@ -25,7 +24,6 @@ before(async () => {
   p = amb.ids.produtoId;
 });
 after(() => amb.fechar());
-
 
 const saldo = (produtoId) => amb.saldo(centro, produtoId);
 
@@ -224,7 +222,6 @@ describe('reconciliacao', () => {
     assert.equal(amb.db.prepare('SELECT status FROM pedidos WHERE id = ?').get(pedido.id).status, 'EM_PREPARO');
     assert.equal(movimentos(pedido.id, 'CONSUMO'), 1);
 
-    // o retry do cliente agora recebe o resultado final
     const retry = await pagar(pedido.id, { cenario: 'TIMEOUT', k });
     assert.equal(retry.status, 201);
     assert.equal(retry.corpo.pagamento.id, r.corpo.pagamento.id);
@@ -256,7 +253,6 @@ describe('reconciliacao', () => {
       { operacao: 'AUTORIZACAO', resultado: 'TIMEOUT' },
       { operacao: 'CONSULTA', resultado: 'TIMEOUT' },
     ]);
-    // limpa pra nao afetar os outros testes deste arquivo
     consulta.resultado = 'RECUSADO';
     await amb.servicos.pagamentos.reconciliar();
   });

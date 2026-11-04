@@ -1,8 +1,5 @@
 import { erros } from '../../domain/erros.js';
 
-// le o bearer, confere assinatura e validade e recarrega o usuario do banco.
-// papel e unidades vem sempre do banco, nunca do token nem do corpo.
-// no modo opcional a falta de token passa, mas token invalido continua 401.
 export function autenticar({ tokens, usuarios }, { opcional = false } = {}) {
   return (req, _res, next) => {
     const cabecalho = req.get('authorization');

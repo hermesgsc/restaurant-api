@@ -1,16 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// gera a colecao e o environment do postman em postman/. a colecao e escrita
-// por aqui pra ficar revisavel e nao depender de exportar na mao pelo app.
-// rode `npm run postman:gerar` depois de mudar alguma requisicao.
-
 const raiz = path.resolve(import.meta.dirname, '..');
 const pasta = path.join(raiz, 'postman');
 
 const js = (...linhas) => linhas.flat();
 
-// "#nome" dentro do corpo vira {{nome}} sem aspas, pra ids numericos
 function corpoJson(corpo) {
   return JSON.stringify(corpo, null, 2).replace(/"#(\w+)"/g, '{{$1}}');
 }
@@ -38,7 +33,6 @@ const status = (s) => `pm.test('status ${s}', () => pm.response.to.have.status($
 const salvar = (variavel, expressao) => `pm.collectionVariables.set('${variavel}', ${expressao});`;
 const novaChave = (variavel) => `pm.collectionVariables.set('${variavel}', pm.variables.replaceIn('{{$guid}}'));`;
 
-// confere o envelope padrao de erro e o codigo
 const erro = (s, codigo) => js(
   status(s),
   `pm.test('envelope de erro ${codigo}', () => {`,
@@ -57,7 +51,6 @@ const login = (nome, email, variavel) => requisicao(nome, 'POST', '/auth/login',
 
 const pedidoCentro = (itens, extra = {}) => ({ unidadeId: '#unidadeCentroId', canalPedido: 'APP', formaPagamento: 'MOCK', ...extra, itens });
 
-// pedido do cliente que deve ser recusado, sempre com chave nova
 const pedidoInvalido = (nome, corpo, testes) => requisicao(nome, 'POST', '/pedidos', {
   token: 'tokenCliente',
   antes: [novaChave('chaveTemp')],
@@ -424,7 +417,6 @@ const fidelidade = {
     }),
     requisicao('Resgate acima do saldo (409)', 'POST', '/pedidos', {
       token: 'tokenCliente',
-      // proximo multiplo de 10 acima do saldo, ainda dentro do subtotal do pedido
       antes: [novaChave('chaveTemp'), salvar('pontosAcimaDoSaldo', "(Math.floor(Number(pm.collectionVariables.get('pontosCliente')) / 10) + 1) * 10")],
       cabecalhos: { 'Idempotency-Key': '{{chaveTemp}}' },
       corpo: pedidoCentro([{ produtoId: '#produtoXBurgerId', quantidade: 1 }], { pontosResgatar: '#pontosAcimaDoSaldo' }),
@@ -445,7 +437,6 @@ const fidelidade = {
   ],
 };
 
-// dispara as tentativas erradas antes da requisicao principal, uma depois da outra
 const tentativasErradas = js(
   "const email = 'bloqueio-' + pm.variables.replaceIn('{{$guid}}').slice(0, 8) + '@teste.local';",
   "pm.collectionVariables.set('emailBloqueio', email);",
@@ -522,7 +513,6 @@ const colecao = {
   item: [auth, unidades, estoque, pedidos, pagamento, fidelidade, errosAuditoria],
 };
 
-// sem token nem segredo: os tokens sao preenchidos durante a execucao
 const ambiente = {
   name: 'Rede de Restaurantes - local',
   values: [

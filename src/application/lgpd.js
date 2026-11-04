@@ -6,10 +6,6 @@ import { StatusPedido } from '../domain/pedido.js';
 
 const STATUS_EM_ANDAMENTO = [StatusPedido.AGUARDANDO_PAGAMENTO, StatusPedido.EM_PREPARO, StatusPedido.PRONTO];
 
-// anonimizacao do titular (cliente). apaga o que identifica a pessoa e mantem
-// o que precisa ficar por obrigacao legal/contabil (pedido, valor, pagamento),
-// agora sem ligacao com nome ou e-mail. a linha do usuario continua existindo
-// porque pedidos e auditoria apontam pra ela pelo id.
 export function criarServicoLgpd({ db, auditoria, fidelidade }) {
   const buscarUsuario = db.prepare('SELECT * FROM usuarios WHERE id = ?');
   const pedidosEmAndamento = db.prepare(`SELECT COUNT(*) AS n FROM pedidos WHERE cliente_id = ? AND status IN (${placeholders(STATUS_EM_ANDAMENTO)})`);
@@ -35,7 +31,6 @@ export function criarServicoLgpd({ db, auditoria, fidelidade }) {
 
       const pontosBaixados = fidelidade.encerrarParaAnonimizacao(usuarioId, { ator, requestId });
       const instante = agora();
-      // senha aleatoria que ninguem conhece, so pra satisfazer o NOT NULL
       const senhaInutil = `anonimizado:${crypto.randomBytes(32).toString('hex')}`;
       db.prepare(`UPDATE usuarios SET nome = ?, email = ?, senha_hash = ?, ativo = 0, anonimizado_em = ?, atualizado_em = ?
         WHERE id = ?`).run('Titular anonimizado', `anonimizado-${usuarioId}@anonimizado.invalid`, senhaInutil, instante, instante, usuarioId);

@@ -18,8 +18,6 @@ function traduzirConflito(erro) {
   return traduzirUnico(erro, 'produtos.nome', () => erros.conflito('NOME_DUPLICADO', 'Ja existe um produto com este nome.', [{ field: 'nome', issue: 'Nome ja utilizado.' }]));
 }
 
-// o catalogo e da rede toda, por isso so admin mexe. produto nunca e apagado,
-// so desativado, pra nao quebrar pedido antigo que aponta pra ele
 export function criarServicoProdutos({ db, auditoria }) {
   const buscar = db.prepare('SELECT * FROM produtos WHERE id = ?');
 

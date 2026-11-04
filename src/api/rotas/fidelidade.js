@@ -15,7 +15,6 @@ export function rotasFidelidade({ servicos, autenticar }) {
     res.json(servicos.fidelidade.historico(req.ator, { pagina: page, limite: limit }));
   });
 
-  // PUT concede e DELETE revoga; os dois sao idempotentes
   r.put('/fidelidade/consentimento', autenticar, (req, res) => {
     res.json(servicos.fidelidade.conceder(req.ator, req.requestId));
   });

@@ -2,9 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-// gera os png de docs/diagramas a partir dos .puml. precisa de java e do
-// plantuml.jar; por padrao procura em .tools/ (fora do git) e aceita
-// JAVA_BIN e PLANTUML_JAR pra apontar pra outro lugar
 const raiz = path.resolve(import.meta.dirname, '..');
 const pasta = path.join(raiz, 'docs', 'diagramas');
 const javaLocal = path.join(raiz, '.tools', 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');

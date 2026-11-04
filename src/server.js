@@ -17,8 +17,6 @@ const servidor = app.listen(config.porta, () => {
   console.log(`API ouvindo em http://localhost:${config.porta} (ambiente ${config.ambiente})`);
 });
 
-// expiracao periodica dos pedidos sem pagamento. com intervalo 0 fica desligada
-// e da pra rodar so pelo comando npm run pedidos:expirar
 let timerExpiracao = null;
 if (config.expiracaoIntervaloMs > 0) {
   timerExpiracao = setInterval(() => {

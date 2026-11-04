@@ -15,7 +15,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-
 async function novoPedido({ email = EMAILS.ana, unidadeId = centro, itens = [{ produtoId: p['X-Salada'], quantidade: 1 }] } = {}) {
   const token = await amb.login(email);
   const r = await amb.chamar('POST', '/pedidos', {
@@ -184,7 +183,6 @@ describe('expiracao', () => {
     assert.equal(amb.db.prepare('SELECT status FROM pedidos WHERE id = ?').get(vigente.id).status, 'AGUARDANDO_PAGAMENTO');
     assert.deepEqual(amb.saldo(shopping, p['X-Burger']), { total: antes.total, reservada: antes.reservada + 1 });
 
-    // rodar de novo nao faz nada
     assert.equal(amb.servicos.ciclo.expirarVencidos().expirados, 0);
   });
 

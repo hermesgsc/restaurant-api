@@ -29,8 +29,6 @@ import { rotasPagamentos } from './api/rotas/pagamentos.js';
 import { rotasFidelidade } from './api/rotas/fidelidade.js';
 import { especificacaoOpenApi } from './api/openapi.js';
 
-// monta os servicos da aplicacao em cima de um banco ja aberto.
-// e o mesmo ponto de entrada pro servidor, pros comandos e pros testes
 export function criarServicos(config, db, { gateway = criarGatewayMock(config.mockPagamento) } = {}) {
   const auditoria = criarAuditoria(db);
   const senhas = criarServicoSenhas(config.bcryptCusto);

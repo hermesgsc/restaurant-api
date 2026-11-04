@@ -16,7 +16,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-
 function criarPedido(token, corpo, k = novaChave()) {
   return amb.chamar('POST', '/pedidos', { token, corpo, cabecalhos: { 'idempotency-key': k } });
 }

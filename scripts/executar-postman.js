@@ -9,11 +9,6 @@ import { criarApp } from '../src/app.js';
 import { criarLogger } from '../src/api/middlewares/basicos.js';
 import { popular } from '../src/infrastructure/seed.js';
 
-// roda a colecao do postman com o newman.
-// sem argumento: sobe a api num banco temporario com seed, roda e apaga tudo,
-// entao nao mexe no banco local. com --url usa um servidor que ja esta no ar
-// (precisa estar com o seed aplicado). --evidencia grava o resumo em docs/evidencias.
-
 const raiz = path.resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
 const urlExterna = args.includes('--url') ? args[args.indexOf('--url') + 1] : null;
@@ -60,8 +55,6 @@ function rodarNewman(url) {
 
 function escreverEvidencia(resumo) {
   const { stats, executions, failures, timings } = resumo.run;
-  // pm.sendRequest do pre-request tambem vira execucao do mesmo item;
-  // fica so a ultima de cada item, que e a requisicao de verdade
   const porItem = new Map();
   for (const ex of executions) porItem.set(ex.item.id, ex);
   const auxiliares = executions.length - porItem.size;

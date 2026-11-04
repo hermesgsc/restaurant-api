@@ -1,6 +1,3 @@
--- estoque independente por unidade e produto.
--- disponivel = quantidade_total - quantidade_reservada (nunca negativo pelos CHECK).
-
 CREATE TABLE estoques (
   unidade_id           INTEGER NOT NULL REFERENCES unidades (id),
   produto_id           INTEGER NOT NULL REFERENCES produtos (id),
@@ -12,9 +9,6 @@ CREATE TABLE estoques (
 );
 CREATE INDEX ix_estoques_produto ON estoques (produto_id);
 
--- historico de toda mudanca de saldo. quantidade e sempre positiva, menos no
--- AJUSTE, que e com sinal. os campos *_apos guardam o saldo depois do movimento.
--- o vinculo com pedido (pedido_id) entra na migracao 003, junto com a tabela pedidos.
 CREATE TABLE estoque_movimentacoes (
   id                    INTEGER PRIMARY KEY,
   unidade_id            INTEGER NOT NULL,

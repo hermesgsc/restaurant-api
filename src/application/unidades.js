@@ -19,7 +19,6 @@ export function criarServicoUnidades({ db, auditoria }) {
     return linha;
   }
 
-  // a listagem e publica mas unidade inativa so aparece pra quem administra
   function listar(ator, { ativa, pagina, limite }) {
     const podeVerInativas = ator && (ator.papel === Papel.ADMIN || ator.papel === Papel.GERENTE);
     const condicoes = [];
@@ -49,7 +48,6 @@ export function criarServicoUnidades({ db, auditoria }) {
     }
   }
 
-  // gerente edita dados da propria unidade mas so admin ativa/desativa
   function atualizar(ator, id, dados, requestId) {
     obter(id);
     if (!temEscopoUnidade(ator, id) || (ator.papel !== Papel.ADMIN && ator.papel !== Papel.GERENTE)) throw erros.proibido();

@@ -37,7 +37,6 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
   const buscarSaldo = db.prepare('SELECT * FROM estoques WHERE unidade_id = ? AND produto_id = ?');
   const criarSaldo = db.prepare(`INSERT INTO estoques (unidade_id, produto_id, quantidade_total, quantidade_reservada, atualizado_em)
     VALUES (?, ?, 0, 0, ?)`);
-  // o WHERE repete o saldo lido: se outro processo mudou a linha no meio, nada e atualizado
   const gravarSaldo = db.prepare(`UPDATE estoques SET quantidade_total = ?, quantidade_reservada = ?, atualizado_em = ?
     WHERE unidade_id = ? AND produto_id = ? AND quantidade_total = ? AND quantidade_reservada = ?`);
 
@@ -45,10 +44,6 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
     (unidade_id, produto_id, tipo, quantidade, total_apos, reservada_apos, pedido_id, usuario_id, motivo, criado_em)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
-  // unico caminho que muda saldo de estoque. roda dentro de transacao
-  // (BEGIN IMMEDIATE) e grava o movimento junto, entao saldo e historico
-  // nunca ficam diferentes. a regra de negativo fica no dominio e o banco
-  // confere de novo pelos CHECK.
   function movimentar({ unidadeId, produtoId, tipo, quantidade, pedidoId = null, usuarioId = null, motivo = null }) {
     return transacao(db, () => {
       const instante = agora();
@@ -87,8 +82,6 @@ export function criarServicoEstoque({ db, auditoria, unidades, produtos }) {
     return { dados: linhas.map(paraSaldo), paginacao };
   }
 
-  // entrada e ajuste manual (inventario, perda, quebra). reserva, consumo e
-  // liberacao so acontecem pelo fluxo do pedido, nunca por esta rota
   function registrarMovimentacao(ator, { unidadeId, produtoId, tipo, quantidade, motivo }, requestId) {
     if (!TIPOS_MANUAIS.includes(tipo)) throw erros.validacao('VALIDACAO', 'Dados de entrada invalidos.', [{ field: 'tipo', issue: 'Use ENTRADA ou AJUSTE.' }]);
     unidades.obter(unidadeId);

@@ -12,9 +12,6 @@ export const MotivoCancelamento = Object.freeze({
   EXPIRADO: 'EXPIRADO',
 });
 
-// efeitos de cada mudanca de estado do pedido. toda mudanca usa UPDATE com
-// "WHERE status = <estado esperado>": se pagamento, cancelamento e expiracao
-// correrem juntos, so o primeiro muda a linha e os outros veem changes = 0.
 export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }) {
   const buscarItens = db.prepare('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? ORDER BY id');
   const pagamentoVivo = db.prepare(`SELECT id, status FROM pagamentos WHERE pedido_id = ? AND status IN (${placeholders(STATUS_PAGAMENTO_VIVO)})`);
@@ -25,8 +22,6 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }
     }
   }
 
-  // chamado dentro da transacao de finalizacao do pagamento.
-  // devolve false se o pedido nao estava mais aguardando pagamento.
   function confirmarPagamento(pedidoId, usuarioId) {
     const instante = agora();
     const r = db.prepare(`UPDATE pedidos SET status = ?, reserva_estoque_status = ?, pago_em = ?, atualizado_em = ?
@@ -40,7 +35,6 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }
     return true;
   }
 
-  // cancela e devolve a reserva. so funciona antes do pagamento confirmado.
   function cancelarNoBanco(pedidoId, motivo, { ator = null, requestId, detalhe = null } = {}) {
     const instante = agora();
     const r = db.prepare(`UPDATE pedidos SET status = ?, reserva_estoque_status = ?, motivo_cancelamento = ?, cancelado_em = ?, atualizado_em = ?
@@ -103,8 +97,6 @@ export function criarCicloPedido({ db, auditoria, estoque, pedidos, fidelidade }
     });
   }
 
-  // cancela pedidos vencidos sem pagamento. pula os que tem pagamento em
-  // PROCESSANDO: esses esperam o resultado ou a reconciliacao.
   function expirarVencidos(instante = agora()) {
     const vencidos = db.prepare(`SELECT p.id FROM pedidos p
       WHERE p.status = ? AND p.expira_em <= ?

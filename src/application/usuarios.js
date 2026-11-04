@@ -29,8 +29,6 @@ export function criarServicoUsuarios({ db, senhas, tokens, limitador, auditoria 
     return { id: linha.id, papel: linha.papel, unidadeIds: unidadeIds(linha.id) };
   }
 
-  // cadastro publico: o papel e sempre CLIENTE, o schema da rota ja barra
-  // campos como papel ou unidadeIds e aqui o valor e fixo de novo por garantia
   async function cadastrarCliente({ nome, email, senha }, requestId) {
     const hash = await senhas.gerarHash(senha);
     const instante = agora();
@@ -61,7 +59,6 @@ export function criarServicoUsuarios({ db, senhas, tokens, limitador, auditoria 
     const confere = await senhas.conferir(senha, linha?.senha_hash);
     if (!linha || !confere || linha.ativo !== 1) {
       auditoria.registrar({ ator: null, acao: 'LOGIN_FALHOU', recursoTipo: 'SESSAO', resultado: 'NEGADO', requestId });
-      // mensagem generica de proposito, nao diz se o e-mail existe
       throw erros.naoAutenticado('Credenciais invalidas.');
     }
     limitador.registrarSucesso(chave);

@@ -15,7 +15,6 @@ before(async () => {
 });
 after(() => amb.fechar());
 
-
 async function clienteComHistorico() {
   const email = `titular-${crypto.randomUUID().slice(0, 8)}@teste.local`;
   const cadastro = await amb.chamar('POST', '/usuarios', { corpo: { nome: 'Maria Titular', email, senha: 'Senha@12345' } });
@@ -46,7 +45,6 @@ describe('anonimizacao', () => {
     assert.equal(u.ativo, 0);
     assert.ok(u.anonimizado_em);
 
-    // pedido e pagamento continuam (registro fiscal), sem dado pessoal
     const pedido = amb.db.prepare('SELECT * FROM pedidos WHERE id = ?').get(c.pedido.id);
     assert.equal(pedido.status, 'ENTREGUE');
     assert.equal(pedido.total_centavos, 2590);
@@ -56,7 +54,6 @@ describe('anonimizacao', () => {
     assert.deepEqual(consentimentos, [{ acao: 'CONCEDIDO', origem: 'TITULAR' }, { acao: 'REVOGADO', origem: 'ANONIMIZACAO' }]);
     assert.equal(amb.db.prepare('SELECT saldo_pontos FROM fidelidade_contas WHERE usuario_id = ?').get(c.id).saldo_pontos, 0);
 
-    // nada no banco guarda mais o nome ou o e-mail antigo
     const tabelas = amb.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((t) => t.name);
     for (const tabela of tabelas) {
       const linhas = amb.db.prepare(`SELECT * FROM "${tabela}"`).all();

@@ -7,9 +7,6 @@ import { abrirBanco } from '../../src/infrastructure/banco.js';
 import { criarApp } from '../../src/app.js';
 import { popular, SENHA_DEMO } from '../../src/infrastructure/seed.js';
 
-// cada arquivo de teste ganha um sqlite real e proprio numa pasta temporaria,
-// com migracoes e seed, e um servidor http numa porta livre.
-// `gateway` permite trocar o mock padrao por um controlado pelo teste
 export async function criarAmbiente(extras = {}, { gateway } = {}) {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'rede-api-teste-'));
   const config = carregarConfig({
@@ -52,7 +49,6 @@ export async function criarAmbiente(extras = {}, { gateway } = {}) {
     return tokens[email];
   }
 
-  // saldo de um produto numa unidade, lido direto do banco
   function saldo(unidadeId, produtoId) {
     return { ...db.prepare('SELECT quantidade_total AS total, quantidade_reservada AS reservada FROM estoques WHERE unidade_id = ? AND produto_id = ?').get(unidadeId, produtoId) };
   }
@@ -66,7 +62,6 @@ export async function criarAmbiente(extras = {}, { gateway } = {}) {
   return { config, db, app, servicos, ids, base, chamar, login, saldo, fechar };
 }
 
-// idempotency-key nova a cada chamada
 export const novaChave = () => `teste-${crypto.randomUUID()}`;
 
 export const EMAILS = {

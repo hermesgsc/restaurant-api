@@ -57,8 +57,6 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
     return paraPedido(buscarPedido.get(id), buscarItens.all(id));
   }
 
-  // quem e o cliente do pedido sai do token, nunca do corpo. funcionario pode
-  // vincular um cliente existente ou vender sem cliente no balcao.
   function resolverCliente(ator, clienteId) {
     if (ator.papel === Papel.CLIENTE) {
       if (clienteId !== undefined && clienteId !== ator.id) throw erros.proibido('Cliente nao pode criar pedido em nome de outra pessoa.');
@@ -80,8 +78,6 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
     if (!PAPEIS_QUE_VENDEM.includes(ator.papel) || !temEscopoUnidade(ator, unidadeId)) throw erros.proibido();
   }
 
-  // monta os itens com preco do banco. o cliente manda so produto e quantidade,
-  // qualquer preco ou total no corpo ja foi barrado pelo schema da rota
   function precificar(unidadeId, itens) {
     const vistos = new Set();
     return itens.map((item, i) => {
@@ -110,8 +106,6 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
     });
   }
 
-  // tudo numa transacao so: pedido, itens e reserva de estoque. se um item
-  // nao tem saldo, o rollback desfaz as reservas dos itens anteriores.
   function inserirPedido(ator, dados) {
     const { unidadeId, canalPedido, itens, formaPagamento } = dados;
     const unidade = buscarUnidade.get(unidadeId);
@@ -146,8 +140,6 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
       }
     });
 
-    // resgate de pontos: debita o saldo na mesma transacao e grava o desconto.
-    // se algo falhar depois (estoque, por exemplo) o rollback devolve os pontos
     if (dados.pontosResgatar) {
       const desconto = fidelidade.reservarResgate({ ator, clienteId, pedidoId, pontos: dados.pontosResgatar, subtotalCentavos: subtotal });
       db.prepare(`UPDATE pedidos SET desconto_centavos = ?, total_centavos = ?, pontos_resgatados = ?, resgate_status = ?
@@ -174,7 +166,6 @@ export function criarServicoPedidos({ db, config, auditoria, estoque, idempotenc
     });
   }
 
-  // cliente so ve os proprios pedidos; funcionario so os das suas unidades
   function exigirAcesso(ator, pedido, requestId) {
     const permitido = ator.papel === Papel.ADMIN
       || (ator.papel === Papel.CLIENTE && pedido.cliente_id === ator.id)

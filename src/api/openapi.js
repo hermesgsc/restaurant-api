@@ -1,10 +1,6 @@
 import { CANAIS_PEDIDO, LIMITES_PEDIDO, STATUS_PEDIDO } from '../domain/pedido.js';
 import { PAPEIS } from '../domain/papeis.js';
 
-// especificacao openapi 3.1 da api. fica em codigo pra reaproveitar as
-// constantes do dominio (canais, status, limites) e nao desatualizar.
-// o teste test/integracao/openapi.test.js confere que toda rota do express esta aqui.
-
 const ref = (nome) => ({ $ref: `#/components/schemas/${nome}` });
 const json = (schema, exemplo) => ({ 'application/json': { schema, ...(exemplo ? { example: exemplo } : {}) } });
 const ok = (descricao, schema, exemplo) => ({ description: descricao, content: json(schema, exemplo) });

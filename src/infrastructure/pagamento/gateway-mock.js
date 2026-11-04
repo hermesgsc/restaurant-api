@@ -2,17 +2,12 @@ import crypto from 'node:crypto';
 
 export const CENARIOS_MOCK = Object.freeze(['APROVAR', 'RECUSAR', 'TIMEOUT']);
 
-// espera de um dia: na pratica o mock nunca responde e quem chamou desiste pelo timeout
 const NUNCA_MS = 24 * 60 * 60 * 1000;
 
 function codigoAutorizacao() {
   return `MOCK-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
-// adaptador simulado do gateway. segue o mesmo contrato que um gateway real
-// seguiria (ver gateway.js), sem rede, sem cartao e sem credencial.
-// o cenario (APROVAR, RECUSAR, TIMEOUT) e escolhido pela configuracao ou pelo
-// cabecalho X-Mock-Cenario, que so existe neste mock e so em dev/teste.
 export function criarGatewayMock({ latenciaMs, cenarioPadrao, resultadoConsulta }) {
   function esperar(ms, signal) {
     return new Promise((resolve, reject) => {
@@ -43,9 +38,6 @@ export function criarGatewayMock({ latenciaMs, cenarioPadrao, resultadoConsulta 
       };
     },
 
-    // consulta usada pela reconciliacao de pagamentos INDEFINIDO. como o mock
-    // nao guarda estado entre processos, a resposta vem da configuracao
-    // MOCK_PAGAMENTO_RESULTADO_CONSULTA, o que deixa o teste deterministico
     async consultar({ referencia }, { signal } = {}) {
       await esperar(latenciaMs, signal);
       if (resultadoConsulta === 'TIMEOUT') await esperar(NUNCA_MS, signal);

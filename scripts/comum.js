@@ -2,7 +2,6 @@ import { carregarConfig, ErroConfiguracao } from '../src/config.js';
 import { abrirBanco, migrar } from '../src/infrastructure/banco.js';
 import { criarServicos } from '../src/app.js';
 
-// abre banco + servicos pros comandos de linha de comando
 export function iniciarComando() {
   try {
     const config = carregarConfig();

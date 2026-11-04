@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import { agora, transacao } from '../infrastructure/banco.js';
 import { erros } from '../domain/erros.js';
 
-// json com chaves ordenadas, pra {a,b} e {b,a} darem o mesmo hash
 function canonico(valor) {
   if (Array.isArray(valor)) return `[${valor.map(canonico).join(',')}]`;
   if (valor && typeof valor === 'object') {
@@ -33,10 +32,6 @@ export function criarServicoIdempotencia({ db }) {
     return { status: registro.status_http, corpo: JSON.parse(registro.corpo_resposta), repetida: true };
   }
 
-  // a chave vale por usuario + operacao. se ja existe com o mesmo hash devolve
-  // a resposta original; com hash diferente e 409. se nao existe, roda `executar`
-  // e grava o resultado na mesma transacao, entao dois retries simultaneos
-  // nunca criam dois pedidos. erro de negocio nao e gravado: o retry roda de novo.
   function executarSincrono({ usuarioId, operacao, chave, dados, executar }) {
     const hash = hashRequisicao(dados);
     return transacao(db, () => {
@@ -49,9 +44,6 @@ export function criarServicoIdempotencia({ db }) {
     });
   }
 
-  // versao em duas fases pra operacoes que chamam servico externo (pagamento):
-  // `iniciar` grava a chave como EM_PROCESSAMENTO dentro da transacao de quem
-  // chamou, e `concluir` grava a resposta final depois da chamada externa
   const inserirPendente = db.prepare(`INSERT INTO idempotencia_registros
     (usuario_id, operacao, chave, hash_requisicao, estado, criado_em, atualizado_em)
     VALUES (?, ?, ?, ?, 'EM_PROCESSAMENTO', ?, ?)`);

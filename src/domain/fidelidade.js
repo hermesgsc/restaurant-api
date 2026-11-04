@@ -1,9 +1,5 @@
 import { erros } from './erros.js';
 
-// regra simples do programa:
-// - ganha 1 ponto a cada R$ 1,00 inteiro pago, quando o pedido e ENTREGUE
-// - resgate em multiplos de 10 pontos; cada 10 pontos valem R$ 1,00 de desconto
-// - o desconto nunca passa do subtotal do pedido
 export const REGRA_FIDELIDADE = Object.freeze({
   centavosPorPonto: 100,
   multiploResgate: 10,
@@ -27,7 +23,6 @@ export function valorDosPontos(pontos) {
   return Math.floor(pontos / REGRA_FIDELIDADE.multiploResgate) * REGRA_FIDELIDADE.centavosPorBlocoResgate;
 }
 
-// valida o pedido de resgate e devolve o desconto em centavos
 export function descontoDoResgate(pontos, subtotalCentavos) {
   if (!Number.isInteger(pontos) || pontos <= 0 || pontos % REGRA_FIDELIDADE.multiploResgate !== 0) {
     throw erros.validacao('RESGATE_INVALIDO', 'Os pontos devem ser resgatados em multiplos de 10.', [

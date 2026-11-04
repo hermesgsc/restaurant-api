@@ -13,7 +13,6 @@ export function ehFuncionario(ator) {
   return PAPEIS_FUNCIONARIO.includes(ator.papel);
 }
 
-// admin representa a matriz e atua em qualquer unidade; funcionario so nas unidades vinculadas
 export function temEscopoUnidade(ator, unidadeId) {
   if (ator.papel === Papel.ADMIN) return true;
   if (!ehFuncionario(ator)) return false;

@@ -1,6 +1,5 @@
 import { agora, transacao } from './banco.js';
 
-// credenciais de demonstracao local. nao sao segredos e nunca devem ir pra producao
 export const SENHA_DEMO = 'Demo@12345';
 
 export const USUARIOS_DEMO = [
@@ -30,8 +29,6 @@ const PRODUTOS = [
   { nome: 'Milkshake', categoria: 'SOBREMESA', descricao: 'Produto descontinuado (inativo).', ativo: 0 },
 ];
 
-// precos e estoque diferentes de proposito pra mostrar que cada unidade e independente.
-// "Suco Natural" so existe na Shopping; "Combo Classico" esta no cardapio do centro mas indisponivel.
 export const CARDAPIOS = {
   'Unidade Centro': [
     ['X-Burger', 2590, 1], ['X-Salada', 2790, 1], ['Batata Frita', 1290, 1],
@@ -44,9 +41,6 @@ export const CARDAPIOS = {
   'Unidade Desativada': [['X-Burger', 2490, 1]],
 };
 
-// estoque diferente por unidade. a Batata Frita do centro tem so 1 unidade,
-// usada pra demonstrar disputa pelo ultimo item. o Refrigerante da shopping
-// fica sem saldo nenhum pra mostrar estoque insuficiente.
 export const ESTOQUE_INICIAL = {
   'Unidade Centro': [
     ['X-Burger', 50], ['X-Salada', 30], ['Batata Frita', 1], ['Refrigerante Lata', 100], ['Combo Classico', 10], ['Milkshake', 5],
@@ -56,7 +50,6 @@ export const ESTOQUE_INICIAL = {
   ],
 };
 
-// popula um banco vazio; recusa rodar se ja tiver usuario pra nao duplicar nada
 export async function popular(db, servicos) {
   if (db.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n > 0) {
     throw new Error('O banco ja tem dados. Rode "npm run db:reset" para recriar do zero.');
