@@ -2,8 +2,6 @@
 
 Projeto acadêmico da disciplina Projeto Back-End, do curso de Análise e Desenvolvimento de Sistemas do Centro Universitário Internacional UNINTER.
 
-É uma API REST para uma rede de restaurantes com matriz e várias unidades: pedidos por vários canais, pagamento simulado, estoque por unidade, programa de fidelidade e tratamento de dados pessoais conforme a LGPD. O projeto é um MVP para fins de estudo e não deve ser usado em produção.
-
 Autor: Hermes Gabriel Santos Crispim (RU 4307859).
 
 ## Tecnologias
