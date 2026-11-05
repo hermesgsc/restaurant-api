@@ -84,7 +84,7 @@ function escreverEvidencia(resumo) {
     linhas.push('', '## Falhas', '');
     for (const f of failures) linhas.push(`- ${f.source?.name}: ${f.error.message}`);
   }
-  const destino = path.join(raiz, 'docs', 'evidencias', 'newman.md');
+  const destino = path.join(raiz, 'tmp', 'evidencia-newman.md');
   fs.mkdirSync(path.dirname(destino), { recursive: true });
   fs.writeFileSync(destino, `${linhas.join('\n')}\n`);
   console.log(`Evidencia gravada em ${path.relative(raiz, destino)}`);
