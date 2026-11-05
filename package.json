@@ -19,6 +19,7 @@
     "postman:gerar": "node scripts/gerar-colecao-postman.js",
     "postman:executar": "node scripts/executar-postman.js",
     "diagramas:renderizar": "node scripts/renderizar-diagramas.js",
+    "relatorio:pdf": "node scripts/gerar-relatorio-pdf.js",
     "test": "node --test --test-concurrency=4 \"test/**/*.test.js\""
   },
   "dependencies": {
