@@ -58,7 +58,7 @@ if (!navegador) {
 
 const temporaria = fs.mkdtempSync(path.join(os.tmpdir(), 'rede-relatorio-'));
 const html = path.join(temporaria, 'relatorio.html');
-const destino = path.join(pasta, `${ru}_Projeto_Back_End.PDF`);
+const destino = path.join(pasta, `${ru}_Projeto_Back_End.pdf`);
 fs.writeFileSync(html, montarHtml());
 fs.rmSync(destino, { force: true });
 

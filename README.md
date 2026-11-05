@@ -31,4 +31,4 @@ Os usuários de demonstração criados pelo seed aparecem no terminal ao rodar `
 
 ## Documentação
 
-O relatório do projeto está em [`docs/relatorio/4307859_Projeto_Back_End.PDF`](docs/relatorio/4307859_Projeto_Back_End.PDF). Os diagramas ficam em [`docs/diagramas/`](docs/diagramas/) e a coleção do Postman em [`postman/`](postman/).
+O relatório do projeto está em [`docs/relatorio/4307859_Projeto_Back_End.pdf`](docs/relatorio/4307859_Projeto_Back_End.pdf). Os diagramas ficam em [`docs/diagramas/`](docs/diagramas/) e a coleção do Postman em [`postman/`](postman/).
